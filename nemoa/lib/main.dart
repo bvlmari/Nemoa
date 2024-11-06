@@ -12,30 +12,94 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Nemoa',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primaryColor: Colors.black,
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+        ),
       ),
-      home: const MyHomePage(title: 'Welcome to Nemoa'),
+      home: const MyHomePage(),
       routes: {
-        '/loginPage': (context) => const LoginPage(),
-        '/mainPage': (context) => const MainPage(),
         '/userProfile': (context) => const UserProfilePage(),
-        '/messages': (context) => const MessagesPage(),
-        '/personalization': (context) => const PersonalizationPage(),
+        '/mainPage': (context) => const MainScaffold(),
+        '/loginPage': (context) => const LoginPage()
       },
     );
   }
 }
 
-class MyHomePage extends StatelessWidget {
-  const MyHomePage({super.key, required this.title});
+class MainScaffold extends StatefulWidget {
+  const MainScaffold({super.key});
 
-  final String title;
+  @override
+  State<MainScaffold> createState() => _MainScaffoldState();
+}
+
+class _MainScaffoldState extends State<MainScaffold> {
+  int _selectedIndex = 0;
+
+  // Colors for each tab
+  final List<Color> _selectedColors = [
+    Colors.blue,
+    Colors.green,
+    Colors.orange,
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  // Define the different pages
+  final List<Widget> _pages = [
+    const MainPage(),
+    const MessagesPage(),
+    const PersonalizationPage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: const Text(
+          'Nemoa',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.pushNamed(context, '/userProfile');
+            },
+          ),
+        ],
+      ),
+      body: _pages[_selectedIndex], // Display the selected page
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        selectedItemColor: _selectedColors[_selectedIndex],
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Messages'),
+          BottomNavigationBarItem(icon: Icon(Icons.view_list), label: 'Personalization'),
+        ],
+      ),
+    );
+  }
+}
+
+class MyHomePage extends StatelessWidget {
+  const MyHomePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('title'),
       ),
       body: Center(
         child: Column(
@@ -43,7 +107,7 @@ class MyHomePage extends StatelessWidget {
           children: <Widget>[
             // Placeholder image - replace with your own image asset or network image if desired
             Image.asset(
-              'assets/your_image.jpg', // Place your image file in the assets folder
+              'assets/your_image.png', // Place your image file in the assets folder
               height: 200,
               width: 200,
             ),
@@ -51,6 +115,10 @@ class MyHomePage extends StatelessWidget {
             const Text(
               'Welcome to Nemoa',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const Text(
+              'Welcome to Nemoa, your animated companion app!',
+              style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -62,7 +130,7 @@ class MyHomePage extends StatelessWidget {
                 Navigator.pushNamed(context, '/loginPage');
               },
               child: const Text(
-                'Enter',
+                'Start',
                 style: TextStyle(color: Colors.white),
               ),
             ),
@@ -90,7 +158,7 @@ class LoginPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Image.asset(
-                'assets/your_image.jpg', // Ensure this file exists in your assets folder
+                'assets/your_image.png', // Ensure this file exists in your assets folder
                 height: 150,
                 width: 150,
               ),
@@ -177,72 +245,36 @@ class MainPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Nemoa',
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return Center(
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          shape: const CircleBorder(),
+          padding: const EdgeInsets.all(40),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.pushNamed(context, '/userProfile');
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(40),
-              ),
-              onPressed: () {
-                // Add action for the central button
-              },
-              child: const Icon(Icons.circle, size: 50),
-            ),
-          ),
-          Positioned(
-            left: 20,
-            bottom: 70,
-            child: IconButton(
-              icon: const Icon(Icons.mic, size: 36),
-              onPressed: () {
-                // Add microphone action
-              },
-            ),
-          ),
-          Positioned(
-            right: 20,
-            bottom: 70,
-            child: IconButton(
-              icon: const Icon(Icons.play_arrow, size: 36),
-              onPressed: () {
-                // Add play media action
-              },
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Messages'),
-          BottomNavigationBarItem(icon: Icon(Icons.view_list), label: 'Personalization'),
-        ],
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.pushNamed(context, '/messages');
-          } else if (index == 2) {
-            Navigator.pushNamed(context, '/personalization');
-          }
+        onPressed: () {
+          // Add action for the central button
         },
+        child: const Icon(Icons.circle, size: 50),
       ),
     );
+  }
+}
+
+class MessagesPage extends StatelessWidget {
+  const MessagesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text('Mensajes'));
+  }
+}
+
+class PersonalizationPage extends StatelessWidget {
+  const PersonalizationPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text('Personalización'));
   }
 }
 
@@ -254,30 +286,6 @@ class UserProfilePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Perfil de Usuario')),
       body: const Center(child: Text('Perfil de Usuario')),
-    );
-  }
-}
-
-class MessagesPage extends StatelessWidget {
-  const MessagesPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mensajes')),
-      body: const Center(child: Text('Mensajes')),
-    );
-  }
-}
-
-class PersonalizationPage extends StatelessWidget {
-  const PersonalizationPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Personalización')),
-      body: const Center(child: Text('Personalización')),
     );
   }
 }
