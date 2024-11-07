@@ -85,7 +85,8 @@ class _MainScaffoldState extends State<MainScaffold> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Messages'),
-          BottomNavigationBarItem(icon: Icon(Icons.view_list), label: 'Personalization'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.view_list), label: 'Personalization'),
         ],
       ),
     );
@@ -108,30 +109,47 @@ class MyHomePage extends StatelessWidget {
             // Placeholder image - replace with your own image asset or network image if desired
             Image.asset(
               'assets/your_image.png', // Place your image file in the assets folder
-              height: 200,
-              width: 200,
+              height: 300,
+              width: 300,
             ),
             const SizedBox(height: 20),
             const Text(
-              'Welcome to Nemoa',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              'NEMOA',
+              style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'Roboto',
+                  color: Color.fromARGB(255, 0, 0, 0)),
+            ),
+            const SizedBox(
+              height: 15,
             ),
             const Text(
-              'Welcome to Nemoa, your animated companion app!',
-              style: TextStyle(fontSize: 16),
+              'Welcome to Nemoa, your animated\n companion app!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                  color: Color.fromARGB(255, 86, 86, 86)),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 50),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black, // Black button color
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
               ),
               onPressed: () {
                 Navigator.pushNamed(context, '/loginPage');
               },
               child: const Text(
                 'Start',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Roboto',
+                  fontSize: 12,
+                ),
               ),
             ),
           ],
@@ -204,11 +222,12 @@ class LoginPage extends StatelessWidget {
                 ),
                 obscureText: true,
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                 ),
                 onPressed: () {
                   // Handle sign-in logic here
