@@ -298,77 +298,86 @@ class LoginPage extends StatelessWidget {
 }
 
 // Pantalla de creación de cuenta
+
 class SignUpPage extends StatelessWidget {
   const SignUpPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    Future<void> _signUp() async {
+      final email = emailController.text;
+      final password = passwordController.text;
+
+      try {
+        final response = await Supabase.instance.client.auth.signUp(
+          email: email,
+          password: password,
+        );
+
+        // Verificar si el registro fue exitoso
+        if (response.user == null) {
+          // Muestra un mensaje de error si no se creó el usuario
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error al registrarse.')),
+          );
+        } else {
+          // Registro exitoso
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registro exitoso!')),
+          );
+          // Redirige al usuario a la pantalla de inicio de sesión
+          Navigator.pushNamed(context, '/loginPage');
+        }
+      } catch (e) {
+        print('Error al registrarse: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al registrarse: $e')),
+        );
+      }
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Crear Cuenta'),
-      ),
+      appBar: AppBar(title: const Text('Crear Cuenta')),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Image.asset(
-                'assets/your_image.png', // Ensure this file exists in your assets folder
-                height: 200,
-                width: 200,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            const Text(
+              'Crear una nueva cuenta',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Ingresa tu correo electrónico',
+                labelText: 'Correo electrónico',
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Register Now, Friend!',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Ingresa tu contraseña',
+                labelText: 'Contraseña',
               ),
-              const SizedBox(height: 10),
-              const Text(
-                'Join your virtual friend now',
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 30),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Correo Electrónico',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 20),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Contraseña',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
-              const SizedBox(height: 20),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Confirmar Contraseña',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                ),
-                onPressed: () {
-                  // Lógica de registro aquí
-                },
-                child: const Text(
-                  'Crear Cuenta',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _signUp,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+              child: const Text('Crear Cuenta',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
       ),
     );
