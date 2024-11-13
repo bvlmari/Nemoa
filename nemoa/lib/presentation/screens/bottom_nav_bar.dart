@@ -1,4 +1,3 @@
-// bottom_nav_bar.dart
 import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/main_page.dart';
 import 'package:nemoa/presentation/screens/messages_page.dart';
@@ -21,17 +20,27 @@ class CustomBottomNavigationBar extends StatelessWidget {
       onTap: (index) {
         onTap(index);
 
-        if (index == 0) {
-          Navigator.pushNamed(context, MainPage.routename);
-        } else if (index == 1) {
-          Navigator.pushNamed(context, MessagesPage.routename);
-        } else if (index == 2) {
-          Navigator.pushNamed(context, PersonalizationPage.routename);
+        // Animación de navegación a cada página según el índice
+        switch (index) {
+          case 0:
+            Navigator.pushReplacementNamed(context, MainPage.routename);
+            break;
+          case 1:
+            Navigator.pushReplacementNamed(context, MessagesPage.routename);
+            break;
+          case 2:
+            Navigator.pushReplacementNamed(
+                context, PersonalizationPage.routename);
+            break;
         }
       },
-      backgroundColor: Colors.white,
-      selectedItemColor: Colors.black,
-      unselectedItemColor: Colors.black,
+      // Personalización de colores y estilo
+      backgroundColor: Colors.black,
+      selectedItemColor: Colors.white60,
+      unselectedItemColor: Colors.white60,
+      type: BottomNavigationBarType.fixed, // Mantiene todos los íconos visibles
+      selectedFontSize: 14,
+      unselectedFontSize: 12,
       items: const <BottomNavigationBarItem>[
         BottomNavigationBarItem(
           icon: Icon(Icons.home),
@@ -39,11 +48,11 @@ class CustomBottomNavigationBar extends StatelessWidget {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.message),
-          label: 'Message',
+          label: 'Messages',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.settings),
-          label: 'Personalization',
+          label: 'Perzonalization',
         ),
       ],
     );
