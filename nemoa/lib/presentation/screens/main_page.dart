@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
 import 'dart:math' as math;
-
 import 'package:nemoa/presentation/screens/custom_header.dart';
 
 class MainPage extends StatefulWidget {
