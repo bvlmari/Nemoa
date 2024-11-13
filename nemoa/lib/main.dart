@@ -33,13 +33,14 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false, // Oculta el banner de debug
       title: 'Nemoa',
       theme: ThemeData(
         primaryColor: Colors.black,
         scaffoldBackgroundColor: Colors.white,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
         ),
       ),
       initialRoute: Homepage.routename,
@@ -52,71 +53,6 @@ class MyApp extends StatelessWidget {
         PersonalizationPage.routename: (context) => const PersonalizationPage(),
         UserProfilePage.routename: (context) => const UserProfilePage(),
       },
-    );
-  }
-}
-
-// Navegación
-class MainScaffold extends StatefulWidget {
-  const MainScaffold({super.key});
-
-  @override
-  State<MainScaffold> createState() => _MainScaffoldState();
-}
-
-class _MainScaffoldState extends State<MainScaffold> {
-  int _selectedIndex = 0;
-
-  // Colores para cada pestaña
-  final List<Color> _selectedColors = [
-    Colors.blue,
-    Colors.green,
-    Colors.orange,
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  // Definir las diferentes páginas
-  final List<Widget> _pages = [
-    const MainPage(),
-    const MessagesPage(),
-    const PersonalizationPage(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Nemoa',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.pushNamed(context, UserProfilePage.routename);
-            },
-          ),
-        ],
-      ),
-      body: _pages[_selectedIndex], // Mostrar la página seleccionada
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: _selectedColors[_selectedIndex],
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Messages'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.view_list), label: 'Personalization'),
-        ],
-      ),
     );
   }
 }

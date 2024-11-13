@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:nemoa/presentation/screens/bottom_nav_bar.dart'; // Asegúrate de importar el widget de la barra de navegación
+import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
 
 class MainPage extends StatefulWidget {
   static const String routename = 'MainPage';
   const MainPage({super.key});
-
   @override
-  _MainPageState createState() => _MainPageState();
+  State<MainPage> createState() => _MainPageState();
 }
 
 class _MainPageState extends State<MainPage> {
-  int _currentIndex =
-      0; // Variable para mantener el índice de la barra de navegación
+  int _currentIndex = 0;
 
-  // Función que maneja el cambio de índice en la barra de navegación
   void _onItemTapped(int index) {
     setState(() {
       _currentIndex = index;
@@ -24,7 +21,24 @@ class _MainPageState extends State<MainPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Main Page'),
+        title: const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Nemoa',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person, color: Colors.black),
+            ),
+          ],
+        ),
+        // Elimina el padding predeterminado del AppBar
+        titleSpacing: 20,
       ),
       body: Center(
         child: ElevatedButton(
@@ -38,8 +52,7 @@ class _MainPageState extends State<MainPage> {
       ),
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap:
-            _onItemTapped, // Se encarga de cambiar el índice cuando el usuario toca un ítem
+        onTap: _onItemTapped,
       ),
     );
   }
