@@ -5,7 +5,7 @@ import 'package:nemoa/presentation/screens/main_page.dart';
 import 'package:nemoa/presentation/screens/messages_page.dart';
 import 'package:nemoa/presentation/screens/personalization_page.dart';
 import 'package:nemoa/presentation/screens/signup_pag.dart';
-import 'package:nemoa/presentation/screens/userprofile_page.dart';
+import 'package:nemoa/presentation/screens/user_profile_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
@@ -42,6 +42,11 @@ class MyApp extends StatelessWidget {
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
         ),
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: Colors.white,
+          selectionColor: Color.fromARGB(255, 154, 154, 154),
+          selectionHandleColor: Color.fromARGB(255, 154, 154, 154),
+      ),
       ),
       initialRoute: Homepage.routename,
       routes: {
