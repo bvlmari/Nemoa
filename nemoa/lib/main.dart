@@ -42,6 +42,11 @@ class MyApp extends StatelessWidget {
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
         ),
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: Colors.white,
+          selectionColor: Color.fromARGB(255, 154, 154, 154),
+          selectionHandleColor: Color.fromARGB(255, 154, 154, 154),
+      ),
       ),
       initialRoute: Homepage.routename,
       routes: {
