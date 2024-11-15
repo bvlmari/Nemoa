@@ -39,25 +39,57 @@ class _SignUpPageState extends State<SignUpPage>
     final password = passwordController.text;
 
     try {
+      // Primero crear el usuario en auth
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
       );
 
       if (response.user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al registrarse.')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registro exitoso!')),
-        );
-        Navigator.pushNamed(context, LoginPage.routename);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error al registrarse.')),
+          );
+        }
+        return;
+      }
+
+      // Si el usuario se creó exitosamente, intentar insertar en datosInicio
+      try {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registro exitoso!')),
+          );
+          Navigator.pushNamed(context, LoginPage.routename);
+        }
+      } catch (dbError) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al guardar datos adicionales: $dbError'),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+
+        // Intenta eliminar el usuario de auth si falla la inserción en datosInicio
+        try {
+          await Supabase.instance.client.auth.admin.deleteUser(
+            response.user!.id,
+          );
+        } catch (e) {
+          // Maneja el error silenciosamente
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al registrarse: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al registrarse: $e'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 

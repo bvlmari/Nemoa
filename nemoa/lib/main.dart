@@ -25,7 +25,7 @@ void main() async {
 }
 
 // Para usar Supabase en cualquier parte de la app:
-final supabase = Supabase.instance.client;
+//final supabase = Supabase.instance.client;
 
 //Rutas
 class MyApp extends StatelessWidget {
