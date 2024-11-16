@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nemoa/presentation/screens/forgot_password_page.dart';
 import 'package:nemoa/presentation/screens/main_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math' as math;
@@ -316,7 +317,8 @@ class _LoginPageState extends State<LoginPage>
                     onPressed: _isLoading
                         ? null
                         : () {
-                            // Manejar lógica de contraseña olvidada
+                            Navigator.pushNamed(
+                                context, ForgotPasswordPage.routename);
                           },
                     child: const Text(
                       'Forgot password?',
