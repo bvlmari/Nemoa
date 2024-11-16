@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nemoa/presentation/screens/forgot_password_page.dart';
 import 'package:nemoa/presentation/screens/home_page.dart';
 import 'package:nemoa/presentation/screens/login_page.dart';
 import 'package:nemoa/presentation/screens/main_page.dart';
@@ -46,7 +47,7 @@ class MyApp extends StatelessWidget {
           cursorColor: Colors.white,
           selectionColor: Color.fromARGB(255, 154, 154, 154),
           selectionHandleColor: Color.fromARGB(255, 154, 154, 154),
-      ),
+        ),
       ),
       initialRoute: Homepage.routename,
       routes: {
@@ -57,6 +58,7 @@ class MyApp extends StatelessWidget {
         MessagesPage.routename: (context) => const MessagesPage(),
         PersonalizationPage.routename: (context) => const PersonalizationPage(),
         UserProfilePage.routename: (context) => const UserProfilePage(),
+        ForgotPasswordPage.routename: (context) => const ForgotPasswordPage(),
       },
     );
   }

@@ -41,6 +41,7 @@ dependencies:
   flutter_form_builder: ^9.5.0
   flutter_dotenv: ^5.2.1
   google_generative_ai: any
+  app_links: ^3.5.1 
 
 dev_dependencies:
   flutter_test:
