@@ -34,12 +34,85 @@ class _SignUpPageState extends State<SignUpPage>
     super.dispose();
   }
 
-  Future<void> _signUp() async {
-    final email = emailController.text;
-    final password = passwordController.text;
+  // Función para validar el formato del correo electrónico
+  bool _isValidEmail(String email) {
+    final emailRegExp = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    return emailRegExp.hasMatch(email);
+  }
 
+// Función para validar la contraseña
+  bool _isValidPassword(String password) {
+    // Debe tener al menos 8 caracteres
+    if (password.length < 8) return false;
+
+    // Debe contener al menos una letra mayúscula
+    if (!password.contains(RegExp(r'[A-Z]'))) return false;
+
+    // Debe contener al menos una letra minúscula
+    if (!password.contains(RegExp(r'[a-z]'))) return false;
+
+    // Debe contener al menos un número
+    if (!password.contains(RegExp(r'[0-9]'))) return false;
+
+    return true;
+  }
+
+  Future<void> _signUp() async {
     try {
-      // Primero crear el usuario en auth
+      final email = emailController.text.trim();
+      final password = passwordController.text;
+
+      // Validación del correo electrónico
+      if (!_isValidEmail(email)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Por favor ingresa un correo electrónico válido'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Validación de la contraseña
+      if (!_isValidPassword(password)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'La contraseña debe tener al menos 8 caracteres, incluir una mayúscula, una minúscula y un número',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Verificar si el correo ya existe en datosInicio
+      final existingUser = await Supabase.instance.client
+          .from('datosInicio')
+          .select('email')
+          .eq('email', email)
+          .maybeSingle();
+
+      // Si encontramos un usuario con ese correo, mostramos el mensaje y salimos
+      if (existingUser != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Este correo electrónico ya está registrado'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 1. Crear el usuario en auth de Supabase
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
@@ -48,44 +121,81 @@ class _SignUpPageState extends State<SignUpPage>
       if (response.user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al registrarse.')),
+            const SnackBar(
+              content: Text('Error al registrarse en autenticación.'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;
       }
 
-      // Si el usuario se creó exitosamente, intentar insertar en datosInicio
+      // 2. Crear el usuario en la tabla usuarios
       try {
+        final usuarioResult = await Supabase.instance.client
+            .from('usuarios')
+            .insert({
+              'nombre': email
+                  .split('@')[0], // Usar parte del email como nombre inicial
+              'descripcion': '', // Descripción vacía
+              'estadoSesion': 0, // Estado inactivo por defecto
+            })
+            .select()
+            .single();
+
+        // 3. Obtener el ID del usuario recién creado
+        final idUsuario = usuarioResult['idUsuario'];
+
+        // 4. Crear el registro en datosInicio
+        final datosInicioResult = await Supabase.instance.client
+            .from('datosInicio')
+            .insert({
+              'email': email,
+              'password': password,
+              'idUsuario': idUsuario,
+            })
+            .select()
+            .single();
+
+        // Si llegamos aquí, significa que todo se guardó correctamente
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registro exitoso!')),
+            const SnackBar(
+              content: Text('¡Registro exitoso!'),
+              backgroundColor: Colors.lightBlue,
+            ),
           );
           Navigator.pushNamed(context, LoginPage.routename);
         }
       } catch (dbError) {
+        // Error específico de la base de datos
+        print('Error en base de datos: $dbError'); // Para debug
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al guardar datos adicionales: $dbError'),
+              content: Text('Error al guardar los datos: $dbError'),
+              backgroundColor: Colors.red,
               duration: const Duration(seconds: 5),
             ),
           );
         }
 
-        // Intenta eliminar el usuario de auth si falla la inserción en datosInicio
+        // 5. Limpiar el usuario de auth si falla la inserción en la base de datos
         try {
           await Supabase.instance.client.auth.admin.deleteUser(
             response.user!.id,
           );
         } catch (e) {
-          // Maneja el error silenciosamente
+          print('Error al eliminar usuario de auth: $e'); // Para debug
         }
       }
     } catch (e) {
+      print('Error general: $e'); // Para debug
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al registrarse: $e'),
+            content: Text('Error en el registro: $e'),
+            backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
         );
