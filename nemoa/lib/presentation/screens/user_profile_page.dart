@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/custom_header.dart';
 import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProfilePage extends StatefulWidget {
   static const String routename = 'UserProfilePage';
-
   const UserProfilePage({super.key});
 
   @override
@@ -27,11 +27,62 @@ class _UserProfilePageState extends State<UserProfilePage> {
     super.dispose();
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     if (_formKey.currentState?.validate() ?? false) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil guardado exitosamente')),
-      );
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final name = _nameController.text;
+        final about = _aboutController.text;
+        final responseStyle = _responseStyleController.text;
+
+        try {
+          // Paso 1: Verificar si el estilo conversacional ya existe
+          final existingStyleResponse = await Supabase.instance.client
+              .from('EstilosConversacionales')
+              .select('idEstilo')
+              .eq('nombreEstilo', responseStyle)
+              .maybeSingle(); // maybeSingle retorna null si no hay resultados
+
+          int? idEstilo;
+
+          if (existingStyleResponse != null) {
+            // El estilo ya existe, tomar el id
+            idEstilo = existingStyleResponse['idEstilo'] as int;
+          } else {
+            // El estilo no existe, lo insertamos
+            final insertStyleResponse = await Supabase.instance.client
+                .from('EstilosConversacionales')
+                .insert({'nombreEstilo': responseStyle})
+                .select('idEstilo')
+                .single();
+
+            idEstilo = insertStyleResponse['idEstilo'] as int;
+          }
+
+          // Paso 2: Guardar el perfil del usuario con el idEstilo
+          final response =
+              await Supabase.instance.client.from('usuarios').upsert({
+            'nombre': name,
+            'descripcion': about,
+            'idEstilo': idEstilo,
+          });
+
+          if (response != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Perfil guardado exitosamente')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Error al guardar el perfil')),
+            );
+          }
+        } catch (e) {
+          // Captura y muestra cualquier error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 
