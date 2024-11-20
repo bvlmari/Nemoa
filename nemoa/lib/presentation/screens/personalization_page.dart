@@ -114,9 +114,9 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   void _toggleAccessory(String accessory) {
     setState(() {
       if (_selectedAccessories.contains(accessory)) {
-        _selectedAccessories.remove(accessory);
+        _selectedAccessories.clear();
       } else {
-        _selectedAccessories.add(accessory);
+        _selectedAccessories = [accessory];
       }
     });
   }
