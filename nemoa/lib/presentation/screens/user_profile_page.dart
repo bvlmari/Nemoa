@@ -41,15 +41,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
               .from('EstilosConversacionales')
               .select('idEstilo')
               .eq('nombreEstilo', responseStyle)
-              .maybeSingle(); // maybeSingle retorna null si no hay resultados
+              .maybeSingle();
 
           int? idEstilo;
 
           if (existingStyleResponse != null) {
-            // El estilo ya existe, tomar el id
             idEstilo = existingStyleResponse['idEstilo'] as int;
           } else {
-            // El estilo no existe, lo insertamos
             final insertStyleResponse = await Supabase.instance.client
                 .from('EstilosConversacionales')
                 .insert({'nombreEstilo': responseStyle})
@@ -59,25 +57,26 @@ class _UserProfilePageState extends State<UserProfilePage> {
             idEstilo = insertStyleResponse['idEstilo'] as int;
           }
 
-          // Paso 2: Guardar el perfil del usuario con el idEstilo
+          // Paso 2: Obtener el idUsuario correspondiente al usuario autenticado
+          final userRecord = await Supabase.instance.client
+              .from('usuarios')
+              .select('idUsuario')
+              .eq('auth_user_id',
+                  user.id) // Verificar por que en la bd no se genera automaticamente auth_user_id
+              .single();
+
+          // Paso 3: Actualizar el perfil del usuario
           final response =
-              await Supabase.instance.client.from('usuarios').upsert({
+              await Supabase.instance.client.from('usuarios').update({
             'nombre': name,
             'descripcion': about,
             'idEstilo': idEstilo,
-          });
+          }).eq('idUsuario', userRecord['idUsuario']);
 
-          if (response != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Perfil guardado exitosamente')),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Error al guardar el perfil')),
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Perfil actualizado exitosamente')),
+          );
         } catch (e) {
-          // Captura y muestra cualquier error
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error: ${e.toString()}')),
           );
