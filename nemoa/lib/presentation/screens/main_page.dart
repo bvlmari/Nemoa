@@ -27,9 +27,9 @@ class _MainPageState extends State<MainPage>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 3),
       vsync: this,
-    )..repeat();
+    );
   }
 
   @override
@@ -42,6 +42,12 @@ class _MainPageState extends State<MainPage>
     setState(() {
       _isLightOn = !_isLightOn;
     });
+
+    if (_isLightOn) {
+      _controller.repeat(); // Inicia las ondas
+    } else {
+      _controller.stop(); // Detiene las ondas
+    }
   }
 
   @override
@@ -64,6 +70,52 @@ class _MainPageState extends State<MainPage>
                   return Stack(
                     alignment: Alignment.center,
                     children: [
+                      // Ondas brillosas
+                      if (_isLightOn)
+                        ...List.generate(3, (index) {
+                          //Numero de ondas
+                          final animationValue =
+                              (_controller.value + (index * 0.1)) %
+                                  1; //espacio entre ondas
+                          final scale = Tween<double>(begin: 1, end: 2.5)
+                              .transform(CurvedAnimation(
+                            // Agregamos una curva
+                            parent: _controller,
+                            curve: Curves.easeInOut,
+                          ).value);
+                          final opacity = Tween<double>(begin: 0.3, end: 1)
+                              .transform(CurvedAnimation(
+                            // Agregamos una curva
+                            parent: _controller,
+                            curve: Curves.easeInOut,
+                          ).value);
+
+                          return Transform.scale(
+                            scale: scale,
+                            child: Container(
+                              width: 150,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    Colors.white.withOpacity(opacity),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.2, 1.0],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.white.withOpacity(0.1),
+                                    blurRadius: 15,
+                                    spreadRadius: 5,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                      // Círculo principal
                       Transform.rotate(
                         angle: _controller.value * 2 * math.pi,
                         child: Container(
