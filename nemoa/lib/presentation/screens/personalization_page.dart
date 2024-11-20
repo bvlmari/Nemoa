@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
 import 'package:nemoa/presentation/screens/custom_header.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PersonalizationPage extends StatefulWidget {
   static const String routename = 'PersonalizationPage';
@@ -18,6 +19,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   String _selectedVoice = 'Voz 1';
   List<String> _selectedAccessories = [];
   String? _selectedIconUrl;
+  //String? _selectedAccessories;
 
   final List<Map<String, dynamic>> _accessories = [
     {
@@ -103,12 +105,6 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     });
   }
 
-  void _onColorSelected(Color color) {
-    setState(() {
-      _selectedColor = color;
-    });
-  }
-
   void _onSectionChanged(int index) {
     setState(() {
       _selectedSection = index;
@@ -122,6 +118,56 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
       } else {
         _selectedAccessories.add(accessory);
       }
+    });
+  }
+
+  Future<void> saveAppearance() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      await supabase.from('Apariencias').insert({
+        'Icono': _selectedIconUrl,
+        'accesorios': _selectedAccessories.join(','),
+      });
+
+      // Mostrar mensaje de éxito
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('¡Apariencia guardada exitosamente!'),
+            backgroundColor: Colors.lightBlue,
+          ),
+        );
+      }
+    } catch (error) {
+      // Mostrar mensaje de error
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar la apariencia: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> loadAppearance(int idApariencia) async {
+    final supabase = Supabase.instance.client;
+    final response = await supabase
+        .from('Apariencias')
+        .select()
+        .eq('idApariencia', idApariencia)
+        .single()
+        .then((data) {
+      final appearanceData = data;
+      setState(() {
+        _selectedIconUrl = appearanceData['Icono'];
+        _selectedAccessories =
+            (appearanceData['accesorios'] as String).split(',');
+      });
+    }).catchError((error) {
+      print('Error al cargar la apariencia: $error');
     });
   }
 
@@ -403,6 +449,31 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
               Expanded(
                 child: SingleChildScrollView(
                   child: _buildSectionContent(),
+                ),
+              ),
+              // Save Button
+              Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Save the appearance
+                      saveAppearance();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          _selectedColor, // Button color based on selection
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Save Appearance',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ),
               ),
             ],
