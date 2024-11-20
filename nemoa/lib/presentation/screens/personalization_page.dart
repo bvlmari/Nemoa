@@ -123,18 +123,56 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
   Future<void> saveAppearance() async {
     final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
 
     try {
-      await supabase.from('Apariencias').insert({
-        'Icono': _selectedIconUrl,
-        'accesorios': _selectedAccessories.join(','),
-      });
+      // 1. Guardar la apariencia
+      final appearanceResponse = await supabase
+          .from('Apariencias')
+          .insert({
+            'Icono': _selectedIconUrl,
+            'accesorios': _selectedAccessories.isNotEmpty
+                ? _selectedAccessories.first
+                : null,
+          })
+          .select()
+          .single();
+
+      if (user != null) {
+        // 2. Obtener el idUsuario
+        final userData = await supabase
+            .from('usuarios')
+            .select('idUsuario')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        // 3. Verificar si el usuario ya tiene un amigo virtual
+        final existingFriend = await supabase
+            .from('amigosVirtuales')
+            .select()
+            .eq('idUsuario', userData['idUsuario'])
+            .maybeSingle();
+
+        if (existingFriend != null) {
+          // 4a. Actualizar el amigo virtual existente
+          await supabase.from('amigosVirtuales').update({
+            'idApariencia': appearanceResponse['idApariencia'],
+          }).eq('idAmigo', existingFriend['idAmigo']);
+        } else {
+          // 4b. Crear un nuevo amigo virtual
+          await supabase.from('amigosVirtuales').insert({
+            'nombre': 'Lisa',
+            'idUsuario': userData['idUsuario'],
+            'idApariencia': appearanceResponse['idApariencia'],
+          });
+        }
+      }
 
       // Mostrar mensaje de éxito
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('¡Apariencia guardada exitosamente!'),
+          const SnackBar(
+            content: Text('¡Apariencia guardada exitosamente!'),
             backgroundColor: Colors.lightBlue,
           ),
         );
