@@ -157,6 +157,14 @@ class _SignUpPageState extends State<SignUpPage>
             .select()
             .single();
 
+        // Crear el amigo virtual.
+        await Supabase.instance.client.from('amigosVirtuales').insert({
+          'nombre': 'Amigo Virtual de ${email.split('@')[0]}',
+          'idUsuario': idUsuario,
+          'idApariencia': null,
+          'idVoz': null,
+        });
+
         // Si llegamos aquí, significa que todo se guardó correctamente
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
