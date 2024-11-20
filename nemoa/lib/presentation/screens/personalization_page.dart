@@ -451,31 +451,39 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                   child: _buildSectionContent(),
                 ),
               ),
-              // Save Button
               Padding(
                 padding: const EdgeInsets.only(top: 20),
                 child: Center(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Save the appearance
-                      saveAppearance();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          _selectedColor, // Button color based on selection
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 200,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        saveAppearance();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 40, vertical: 15),
+                        side: BorderSide(
+                          color: Colors.white.withOpacity(0.8),
+                          width: 1,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Save Appearance',
-                      style: TextStyle(color: Colors.white),
+                      child: const Text(
+                        'Save Appearance',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              )
             ],
           ),
         ),
