@@ -117,11 +117,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
   void _toggleAccessory(String accessory) {
     setState(() {
-      if (_selectedAccessories.contains(accessory)) {
-        _selectedAccessories.remove(accessory);
-      } else {
-        _selectedAccessories.add(accessory);
-      }
+      _selectedAccessories.clear();
+      _selectedAccessories.add(accessory);
     });
   }
 
@@ -186,45 +183,67 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           itemBuilder: (context, index) {
             final accessory = _accessories[index];
             final isSelected = _selectedAccessories.contains(accessory['name']);
-            return GestureDetector(
-              onTap: () => _toggleAccessory(accessory['name']),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                decoration: BoxDecoration(
-                  color: isSelected ? _selectedColor : Colors.grey.shade800,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: isSelected ? Colors.white : Colors.grey.shade600,
-                    width: 2,
+            return Column(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _toggleAccessory(accessory['name']),
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? _selectedColor
+                                : Colors.grey.shade800,
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.grey.shade600,
+                              width: 2,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: _selectedColor.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    )
+                                  ]
+                                : null,
+                          ),
+                        ),
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(15),
+                            child: Image.network(
+                              accessory['imageUrl'],
+                              color: Colors.white,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.error_outline,
+                                  color: Colors.white,
+                                  size: 30,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.network(
-                      accessory['imageUrl'],
-                      width: 30,
-                      height: 30,
-                      color: Colors.white,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.error_outline,
-                          color: Colors.white,
-                          size: 30,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      accessory['name'],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 4),
+                Text(
+                  accessory['name'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
+              ],
             );
           },
         );
@@ -297,8 +316,11 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           ),
         ],
       ),
-      child: _selectedIconUrl != null
-          ? ClipOval(
+      child: Stack(
+        children: [
+          // Si hay un ícono seleccionado, mostrarlo
+          if (_selectedIconUrl != null)
+            ClipOval(
               child: Image.network(
                 _selectedIconUrl!,
                 fit: BoxFit.cover,
@@ -310,8 +332,29 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                   );
                 },
               ),
-            )
-          : null,
+            ),
+          // Si hay un accesorio seleccionado, mostrarlo encima del ícono
+          if (_selectedAccessories.isNotEmpty)
+            Center(
+              child: Image.network(
+                _accessories.firstWhere((accessory) =>
+                    accessory['name'] ==
+                    _selectedAccessories.first)['imageUrl'],
+                color: Colors.white,
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.error_outline,
+                    color: Colors.white,
+                    size: 30,
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 
