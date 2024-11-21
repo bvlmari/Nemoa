@@ -16,6 +16,7 @@ class _SignUpPageState extends State<SignUpPage>
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   late AnimationController _controller;
+  bool _obscureText = true;
 
   @override
   void initState() {
@@ -273,7 +274,7 @@ class _SignUpPageState extends State<SignUpPage>
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Crear una nueva cuenta',
+                  'Create a new account',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -285,7 +286,7 @@ class _SignUpPageState extends State<SignUpPage>
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Correo electrónico',
+                    'Email',
                     style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
@@ -295,7 +296,7 @@ class _SignUpPageState extends State<SignUpPage>
                   decoration: const InputDecoration(
                     filled: true,
                     fillColor: Colors.white10,
-                    hintText: 'Ingresa tu correo electrónico',
+                    hintText: 'Enter your email',
                     hintStyle: TextStyle(color: Colors.grey),
                     border: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white54),
@@ -315,29 +316,42 @@ class _SignUpPageState extends State<SignUpPage>
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Contraseña',
+                    'Password',
                     style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: passwordController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white10,
-                    hintText: 'Ingresa tu contraseña',
-                    hintStyle: TextStyle(color: Colors.grey),
-                    border: OutlineInputBorder(
+                    hintText: 'Enter your password',
+                    hintStyle: const TextStyle(color: Colors.grey),
+                    border: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white54),
                     ),
-                    enabledBorder: OutlineInputBorder(
+                    enabledBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white54),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.lightBlue),
                     ),
+                    // Añadir este suffixIcon
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureText ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                      },
+                    ),
                   ),
-                  obscureText: true,
+                  obscureText:
+                      _obscureText, // Cambiar de 'true' a '_obscureText'
                   style: const TextStyle(color: Colors.white),
                 ),
                 const SizedBox(height: 30),
