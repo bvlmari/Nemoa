@@ -92,32 +92,13 @@ class _SignUpPageState extends State<SignUpPage>
         return;
       }
 
-      // Verificar si el correo ya existe en datosInicio
-      final existingUser = await Supabase.instance.client
-          .from('datosInicio')
-          .select('email')
-          .eq('email', email)
-          .maybeSingle();
-
-      // Si encontramos un usuario con ese correo, mostramos el mensaje y salimos
-      if (existingUser != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Este correo electrónico ya está registrado'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
       // 1. Crear el usuario en auth de Supabase
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
       );
 
+      // Verificar si el usuario fue creado correctamente
       if (response.user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -131,6 +112,9 @@ class _SignUpPageState extends State<SignUpPage>
       }
 
       // 2. Crear el usuario en la tabla usuarios
+      final authUserId = response.user!.id;
+
+      // 3. Crear el usuario en la tabla usuarios
       try {
         final usuarioResult = await Supabase.instance.client
             .from('usuarios')
@@ -139,25 +123,23 @@ class _SignUpPageState extends State<SignUpPage>
                   .split('@')[0], // Usar parte del email como nombre inicial
               'descripcion': '', // Descripción vacía
               'estadoSesion': 0, // Estado inactivo por defecto
+              'auth_user_id':
+                  authUserId, // Asignar el UID generado por Supabase
             })
             .select()
             .single();
 
-        // 3. Obtener el ID del usuario recién creado
+        // 4. Obtener el ID del usuario recién creado
         final idUsuario = usuarioResult['idUsuario'];
 
-        // 4. Crear el registro en datosInicio
-        final datosInicioResult = await Supabase.instance.client
-            .from('datosInicio')
-            .insert({
-              'email': email,
-              'password': password,
-              'idUsuario': idUsuario,
-            })
-            .select()
-            .single();
+        // 5. Crear el registro en datosInicio
+        await Supabase.instance.client.from('datosInicio').insert({
+          'email': email,
+          'password': password,
+          'idUsuario': idUsuario,
+        });
 
-        // Crear el amigo virtual.
+        // 6. Crear el amigo virtual.
         await Supabase.instance.client.from('amigosVirtuales').insert({
           'nombre': 'Amigo Virtual de ${email.split('@')[0]}',
           'idUsuario': idUsuario,
@@ -188,11 +170,9 @@ class _SignUpPageState extends State<SignUpPage>
           );
         }
 
-        // 5. Limpiar el usuario de auth si falla la inserción en la base de datos
+        // Limpiar el usuario de auth si falla la inserción en la base de datos
         try {
-          await Supabase.instance.client.auth.admin.deleteUser(
-            response.user!.id,
-          );
+          await Supabase.instance.client.auth.admin.deleteUser(authUserId);
         } catch (e) {
           print('Error al eliminar usuario de auth: $e'); // Para debug
         }
