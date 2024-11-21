@@ -50,7 +50,7 @@ class _TestPageState extends State<TestPage> {
         final String? transcription = jsonResponse['results']?['channels']?[0]?['alternatives']?[0]?['transcript'];
 
         setState(() {
-          responseMessage = transcription ?? 'No transcription found.';
+          _message = transcription ?? 'No transcription found.';
         });
       } else {
         setState(() {
@@ -149,7 +149,7 @@ class _TestPageState extends State<TestPage> {
 
   void _playAudio() async {
     // Load and play an audio file from the assets or a network URL
-    await player.play(UrlSource('assets/audioEN.mp3'));
+    await player.play(AssetSource('audioEN.mp3'));
   }
 
   // Function to update the message when Button A is clicked
@@ -163,22 +163,32 @@ class _TestPageState extends State<TestPage> {
   // Function to update the message when Button B is clicked
   void _buttonBClicked() {
     setState(() {
+      _message = 'Button B was clicked';
       _sendAudioFile();
-      _message = responseMessage;
     });
   }
 
   void _buttonCClicked() {
     setState(() {
-      _message = 'Button C was clicked';
-      _sendToGemini(responseMessage);
+      //_message = 'Button C was clicked';
+      _sendToGemini(_message);
     });
   }
 
   void _buttonDClicked() {
     setState(() {
-      _message = 'Button D was clicked';
-      _textToSpeech('Hola, te extrañe mucho');
+      //_message = 'Button D was clicked';
+      //_textToSpeech('Hola, te extrañe mucho');
+      _textToSpeech(_message);
+    });
+  }
+
+  void _megaMethod() {
+    setState(() {
+      _buttonAClicked();
+      _buttonBClicked();
+      _buttonCClicked();
+      _buttonDClicked();
     });
   }
 
