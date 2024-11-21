@@ -16,6 +16,7 @@ class _SignUpPageState extends State<SignUpPage>
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   late AnimationController _controller;
+  bool _obscureText = true;
 
   @override
   void initState() {
@@ -92,32 +93,13 @@ class _SignUpPageState extends State<SignUpPage>
         return;
       }
 
-      // Verificar si el correo ya existe en datosInicio
-      final existingUser = await Supabase.instance.client
-          .from('datosInicio')
-          .select('email')
-          .eq('email', email)
-          .maybeSingle();
-
-      // Si encontramos un usuario con ese correo, mostramos el mensaje y salimos
-      if (existingUser != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Este correo electrónico ya está registrado'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
       // 1. Crear el usuario en auth de Supabase
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
       );
 
+      // Verificar si el usuario fue creado correctamente
       if (response.user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -131,6 +113,9 @@ class _SignUpPageState extends State<SignUpPage>
       }
 
       // 2. Crear el usuario en la tabla usuarios
+      final authUserId = response.user!.id;
+
+      // 3. Crear el usuario en la tabla usuarios
       try {
         final usuarioResult = await Supabase.instance.client
             .from('usuarios')
@@ -139,25 +124,23 @@ class _SignUpPageState extends State<SignUpPage>
                   .split('@')[0], // Usar parte del email como nombre inicial
               'descripcion': '', // Descripción vacía
               'estadoSesion': 0, // Estado inactivo por defecto
+              'auth_user_id':
+                  authUserId, // Asignar el UID generado por Supabase
             })
             .select()
             .single();
 
-        // 3. Obtener el ID del usuario recién creado
+        // 4. Obtener el ID del usuario recién creado
         final idUsuario = usuarioResult['idUsuario'];
 
-        // 4. Crear el registro en datosInicio
-        final datosInicioResult = await Supabase.instance.client
-            .from('datosInicio')
-            .insert({
-              'email': email,
-              'password': password,
-              'idUsuario': idUsuario,
-            })
-            .select()
-            .single();
+        // 5. Crear el registro en datosInicio
+        await Supabase.instance.client.from('datosInicio').insert({
+          'email': email,
+          'password': password,
+          'idUsuario': idUsuario,
+        });
 
-        // Crear el amigo virtual.
+        // 6. Crear el amigo virtual.
         await Supabase.instance.client.from('amigosVirtuales').insert({
           'nombre': 'Amigo Virtual de ${email.split('@')[0]}',
           'idUsuario': idUsuario,
@@ -188,11 +171,9 @@ class _SignUpPageState extends State<SignUpPage>
           );
         }
 
-        // 5. Limpiar el usuario de auth si falla la inserción en la base de datos
+        // Limpiar el usuario de auth si falla la inserción en la base de datos
         try {
-          await Supabase.instance.client.auth.admin.deleteUser(
-            response.user!.id,
-          );
+          await Supabase.instance.client.auth.admin.deleteUser(authUserId);
         } catch (e) {
           print('Error al eliminar usuario de auth: $e'); // Para debug
         }
@@ -293,7 +274,7 @@ class _SignUpPageState extends State<SignUpPage>
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Crear una nueva cuenta',
+                  'Create a new account',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -305,7 +286,7 @@ class _SignUpPageState extends State<SignUpPage>
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Correo electrónico',
+                    'Email',
                     style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
@@ -315,7 +296,7 @@ class _SignUpPageState extends State<SignUpPage>
                   decoration: const InputDecoration(
                     filled: true,
                     fillColor: Colors.white10,
-                    hintText: 'Ingresa tu correo electrónico',
+                    hintText: 'Enter your email',
                     hintStyle: TextStyle(color: Colors.grey),
                     border: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white54),
@@ -335,29 +316,42 @@ class _SignUpPageState extends State<SignUpPage>
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Contraseña',
+                    'Password',
                     style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: passwordController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white10,
-                    hintText: 'Ingresa tu contraseña',
-                    hintStyle: TextStyle(color: Colors.grey),
-                    border: OutlineInputBorder(
+                    hintText: 'Enter your password',
+                    hintStyle: const TextStyle(color: Colors.grey),
+                    border: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white54),
                     ),
-                    enabledBorder: OutlineInputBorder(
+                    enabledBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white54),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.lightBlue),
                     ),
+                    // Añadir este suffixIcon
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureText ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                      },
+                    ),
                   ),
-                  obscureText: true,
+                  obscureText:
+                      _obscureText, // Cambiar de 'true' a '_obscureText'
                   style: const TextStyle(color: Colors.white),
                 ),
                 const SizedBox(height: 30),
