@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
 import 'dart:math' as math;
 import 'package:nemoa/presentation/screens/custom_header.dart';
+import 'package:nemoa/presentation/screens/test_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MainPage extends StatefulWidget {
@@ -197,6 +198,11 @@ class _MainPageState extends State<MainPage>
   void _onCircleTapped() {
     setState(() {
       _isLightOn = !_isLightOn;
+      
+      Navigator.pushNamed(
+        context,
+        TestPage.routename,
+      );
     });
 
     if (_isLightOn) {

@@ -7,6 +7,7 @@ import 'package:nemoa/presentation/screens/messages_page.dart';
 import 'package:nemoa/presentation/screens/personalization_page.dart';
 import 'package:nemoa/presentation/screens/signup_pag.dart';
 import 'package:nemoa/presentation/screens/user_profile_page.dart';
+import 'package:nemoa/presentation/screens/test_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
@@ -58,6 +59,7 @@ class MyApp extends StatelessWidget {
         MessagesPage.routename: (context) => const MessagesPage(),
         PersonalizationPage.routename: (context) => const PersonalizationPage(),
         UserProfilePage.routename: (context) => const UserProfilePage(),
+        TestPage.routename: (context) => const TestPage(),
         ForgotPasswordPage.routename: (context) => const ForgotPasswordPage(),
       },
     );
