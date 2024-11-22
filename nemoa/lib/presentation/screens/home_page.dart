@@ -133,7 +133,7 @@ class _HomepageState extends State<Homepage>
                 ),
               ),
               const SizedBox(height: 30),
-              // Botones con estilo mejorado
+              // Botones
               Container(
                 width: 200,
                 child: ElevatedButton(
@@ -153,7 +153,7 @@ class _HomepageState extends State<Homepage>
                     Navigator.pushNamed(context, LoginPage.routename);
                   },
                   child: const Text(
-                    'Iniciar Sesión',
+                    'Log In',
                     style: TextStyle(
                       color: Colors.white,
                       fontFamily: 'Roboto',
@@ -182,7 +182,7 @@ class _HomepageState extends State<Homepage>
                     Navigator.pushNamed(context, SignUpPage.routename);
                   },
                   child: const Text(
-                    'Crear Cuenta',
+                    'Sign Up',
                     style: TextStyle(
                       color: Colors.white,
                       fontFamily: 'Roboto',

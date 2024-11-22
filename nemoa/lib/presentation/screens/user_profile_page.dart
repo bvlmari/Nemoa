@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/custom_header.dart';
 import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProfilePage extends StatefulWidget {
   static const String routename = 'UserProfilePage';
-
   const UserProfilePage({super.key});
 
   @override
@@ -27,11 +27,61 @@ class _UserProfilePageState extends State<UserProfilePage> {
     super.dispose();
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     if (_formKey.currentState?.validate() ?? false) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil guardado exitosamente')),
-      );
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final name = _nameController.text;
+        final about = _aboutController.text;
+        final responseStyle = _responseStyleController.text;
+
+        try {
+          // Paso 1: Verificar si el estilo conversacional ya existe
+          final existingStyleResponse = await Supabase.instance.client
+              .from('EstilosConversacionales')
+              .select('idEstilo')
+              .eq('nombreEstilo', responseStyle)
+              .maybeSingle();
+
+          int? idEstilo;
+
+          if (existingStyleResponse != null) {
+            idEstilo = existingStyleResponse['idEstilo'] as int;
+          } else {
+            final insertStyleResponse = await Supabase.instance.client
+                .from('EstilosConversacionales')
+                .insert({'nombreEstilo': responseStyle})
+                .select('idEstilo')
+                .single();
+
+            idEstilo = insertStyleResponse['idEstilo'] as int;
+          }
+
+          // Paso 2: Obtener el idUsuario correspondiente al usuario autenticado
+          final userRecord = await Supabase.instance.client
+              .from('usuarios')
+              .select('idUsuario')
+              .eq('auth_user_id',
+                  user.id) // Verificar por que en la bd no se genera automaticamente auth_user_id
+              .single();
+
+          // Paso 3: Actualizar el perfil del usuario
+          final response =
+              await Supabase.instance.client.from('usuarios').update({
+            'nombre': name,
+            'descripcion': about,
+            'idEstilo': idEstilo,
+          }).eq('idUsuario', userRecord['idUsuario']);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Perfil actualizado exitosamente')),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 

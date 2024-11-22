@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nemoa/presentation/screens/forgot_password_page.dart';
 import 'package:nemoa/presentation/screens/home_page.dart';
 import 'package:nemoa/presentation/screens/login_page.dart';
 import 'package:nemoa/presentation/screens/main_page.dart';
@@ -26,7 +27,7 @@ void main() async {
 }
 
 // Para usar Supabase en cualquier parte de la app:
-final supabase = Supabase.instance.client;
+//final supabase = Supabase.instance.client;
 
 //Rutas
 class MyApp extends StatelessWidget {
@@ -47,7 +48,7 @@ class MyApp extends StatelessWidget {
           cursorColor: Colors.white,
           selectionColor: Color.fromARGB(255, 154, 154, 154),
           selectionHandleColor: Color.fromARGB(255, 154, 154, 154),
-      ),
+        ),
       ),
       initialRoute: Homepage.routename,
       routes: {
@@ -59,6 +60,7 @@ class MyApp extends StatelessWidget {
         PersonalizationPage.routename: (context) => const PersonalizationPage(),
         UserProfilePage.routename: (context) => const UserProfilePage(),
         TestPage.routename: (context) => const TestPage(),
+        ForgotPasswordPage.routename: (context) => const ForgotPasswordPage(),
       },
     );
   }
