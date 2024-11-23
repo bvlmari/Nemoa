@@ -103,7 +103,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentFriendName();
+    _loadCurrentFriendData();
   }
 
   @override
@@ -180,9 +180,11 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             'idApariencia': appearanceResponse['idApariencia'],
           });
         }
+
+        // 5. Recargar los datos después de guardar
+        await _loadCurrentFriendData();
       }
 
-      // Mostrar mensaje de éxito
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -192,7 +194,6 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
         );
       }
     } catch (error) {
-      // Mostrar mensaje de error
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -223,31 +224,58 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     });
   }
 
-  Future<void> _loadCurrentFriendName() async {
+  Future<void> _loadCurrentFriendData() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
     if (user != null) {
       try {
+        // 1. Obtener el idUsuario
         final userData = await supabase
             .from('usuarios')
             .select('idUsuario')
             .eq('auth_user_id', user.id)
             .single();
 
-        final friendData = await supabase
-            .from('amigosVirtuales')
-            .select('nombre')
-            .eq('idUsuario', userData['idUsuario'])
-            .maybeSingle();
+        // 2. Obtener los datos del amigo virtual incluyendo la apariencia
+        final friendData = await supabase.from('amigosVirtuales').select('''
+              *,
+              Apariencias (
+                Icono,
+                accesorios
+              )
+            ''').eq('idUsuario', userData['idUsuario']).maybeSingle();
 
         if (friendData != null && mounted) {
           setState(() {
+            // Actualizar el nombre
             _nameController.text = friendData['nombre'];
+
+            // Actualizar la apariencia
+            if (friendData['Apariencias'] != null) {
+              _selectedIconUrl = friendData['Apariencias']['Icono'];
+
+              // Actualizar accesorios si existen
+              if (friendData['Apariencias']['accesorios'] != null) {
+                _selectedAccessories = [
+                  friendData['Apariencias']['accesorios']
+                ];
+              } else {
+                _selectedAccessories = [];
+              }
+            }
           });
         }
       } catch (error) {
-        print('Error loading friend name: $error');
+        print('Error loading friend data: $error');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cargar los datos: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -485,12 +513,13 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
       ),
       child: Stack(
         children: [
-          // Si hay un ícono seleccionado, mostrarlo
           if (_selectedIconUrl != null)
             ClipOval(
               child: Image.network(
                 _selectedIconUrl!,
                 fit: BoxFit.cover,
+                width: 120,
+                height: 120,
                 errorBuilder: (context, error, stackTrace) {
                   return const Icon(
                     Icons.error_outline,
@@ -498,26 +527,39 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                     size: 40,
                   );
                 },
-              ),
-            ),
-          // Si hay un accesorio seleccionado, mostrarlo encima del ícono
-          if (_selectedAccessories.isNotEmpty)
-            Center(
-              child: Image.network(
-                _accessories.firstWhere((accessory) =>
-                    accessory['name'] ==
-                    _selectedAccessories.first)['imageUrl'],
-                color: Colors.white,
-                height: 40,
-                width: 40,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.error_outline,
-                    color: Colors.white,
-                    size: 30,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
                   );
                 },
+              ),
+            ),
+          if (_selectedAccessories.isNotEmpty)
+            Positioned.fill(
+              child: Center(
+                child: Image.network(
+                  _accessories.firstWhere((accessory) =>
+                      accessory['name'] ==
+                      _selectedAccessories.first)['imageUrl'],
+                  color: Colors.white,
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.error_outline,
+                      color: Colors.white,
+                      size: 30,
+                    );
+                  },
+                ),
               ),
             ),
         ],
