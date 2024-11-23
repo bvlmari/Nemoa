@@ -70,7 +70,7 @@ class _SignUpPageState extends State<SignUpPage>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Por favor ingresa un correo electrónico válido'),
+              content: Text('Please enter a valid email address'),
               backgroundColor: Colors.red,
             ),
           );
@@ -84,9 +84,30 @@ class _SignUpPageState extends State<SignUpPage>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'La contraseña debe tener al menos 8 caracteres, incluir una mayúscula, una minúscula y un número',
+                'Password must be at least 8 characters long, include one uppercase, one lowercase, and one number',
               ),
               backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Verificar si el email ya existe en la tabla datosInicio
+      final existingUser = await Supabase.instance.client
+          .from('datosInicio')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+
+      if (existingUser != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'This email is already registered. Please use a different email or sign in.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
             ),
           );
         }
@@ -104,7 +125,7 @@ class _SignUpPageState extends State<SignUpPage>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Error al registrarse en autenticación.'),
+              content: Text('Error registering for authentication.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -152,7 +173,7 @@ class _SignUpPageState extends State<SignUpPage>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('¡Registro exitoso!'),
+              content: Text('Registration successful!'),
               backgroundColor: Colors.lightBlue,
             ),
           );
@@ -160,11 +181,11 @@ class _SignUpPageState extends State<SignUpPage>
         }
       } catch (dbError) {
         // Error específico de la base de datos
-        print('Error en base de datos: $dbError'); // Para debug
+        print('Database error: $dbError'); // Para debug
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al guardar los datos: $dbError'),
+              content: Text('Error saving data: $dbError'),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 5),
             ),
@@ -175,15 +196,31 @@ class _SignUpPageState extends State<SignUpPage>
         try {
           await Supabase.instance.client.auth.admin.deleteUser(authUserId);
         } catch (e) {
-          print('Error al eliminar usuario de auth: $e'); // Para debug
+          print('Error deleting auth user: $e'); // Para debug
         }
       }
-    } catch (e) {
-      print('Error general: $e'); // Para debug
+    } on AuthException catch (e) {
+      // Manejar específicamente errores de autenticación
+      String errorMessage = 'Error in registration';
+      if (e.message.contains('already registered')) {
+        errorMessage =
+            'This email is already registered. Please use a different email or sign in.';
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error en el registro: $e'),
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      print('General error: $e'); // Para debug
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error in registration: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -373,7 +410,7 @@ class _SignUpPageState extends State<SignUpPage>
                       ),
                     ),
                     child: const Text(
-                      'Crear Cuenta',
+                      'Create Account',
                       style: TextStyle(
                         color: Colors.white,
                         fontFamily: 'Roboto',
@@ -388,7 +425,7 @@ class _SignUpPageState extends State<SignUpPage>
                     Navigator.pushNamed(context, LoginPage.routename);
                   },
                   child: const Text(
-                    '¿Ya tienes una cuenta? Inicia sesión',
+                    'Already have an account? Sign in',
                     style: TextStyle(
                       decoration: TextDecoration.underline,
                       color: Colors.lightBlue,
