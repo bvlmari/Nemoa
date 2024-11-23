@@ -20,7 +20,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   List<String> _selectedAccessories = [];
   String? _selectedIconUrl;
   //String? _selectedAccessories;
-
+  TextEditingController _nameController = TextEditingController(text: 'Lisa');
+  bool _isEditingName = false;
   final List<Map<String, dynamic>> _accessories = [
     {
       'name': 'Flor',
@@ -99,6 +100,18 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
   final List<String> _voiceOptions = ['Voz 1', 'Voz 2', 'Voz 3', 'Voz 4'];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentFriendName();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _currentIndex = index;
@@ -157,11 +170,12 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           // 4a. Actualizar el amigo virtual existente
           await supabase.from('amigosVirtuales').update({
             'idApariencia': appearanceResponse['idApariencia'],
+            'nombre': _nameController.text,
           }).eq('idAmigo', existingFriend['idAmigo']);
         } else {
           // 4b. Crear un nuevo amigo virtual
           await supabase.from('amigosVirtuales').insert({
-            'nombre': 'Lisa',
+            'nombre': _nameController.text,
             'idUsuario': userData['idUsuario'],
             'idApariencia': appearanceResponse['idApariencia'],
           });
@@ -207,6 +221,72 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     }).catchError((error) {
       print('Error al cargar la apariencia: $error');
     });
+  }
+
+  Future<void> _loadCurrentFriendName() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        final userData = await supabase
+            .from('usuarios')
+            .select('idUsuario')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        final friendData = await supabase
+            .from('amigosVirtuales')
+            .select('nombre')
+            .eq('idUsuario', userData['idUsuario'])
+            .maybeSingle();
+
+        if (friendData != null && mounted) {
+          setState(() {
+            _nameController.text = friendData['nombre'];
+          });
+        }
+      } catch (error) {
+        print('Error loading friend name: $error');
+      }
+    }
+  }
+
+  Future<void> _updateFriendName(String newName) async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        final userData = await supabase
+            .from('usuarios')
+            .select('idUsuario')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        await supabase
+            .from('amigosVirtuales')
+            .update({'nombre': newName}).eq('idUsuario', userData['idUsuario']);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('¡Nombre actualizado exitosamente!'),
+              backgroundColor: Colors.lightBlue,
+            ),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al actualizar el nombre: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildSectionContent() {
@@ -445,6 +525,55 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     );
   }
 
+  Widget _buildNameWidget() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isEditingName = true;
+        });
+      },
+      child: _isEditingName
+          ? Container(
+              width: 150,
+              child: TextField(
+                controller: _nameController,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Roboto',
+                ),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  border: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                  ),
+                ),
+                onSubmitted: (value) {
+                  if (value.isNotEmpty) {
+                    _updateFriendName(value);
+                    setState(() {
+                      _isEditingName = false;
+                    });
+                  }
+                },
+              ),
+            )
+          : Text(
+              _nameController.text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+                color: Colors.white,
+              ),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -461,20 +590,12 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                 child: Column(
                   children: [
                     _buildPreviewAvatar(),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Lisa',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Roboto',
-                        color: Colors.white,
-                      ),
-                    ),
+                    const SizedBox(height: 20),
+                    _buildNameWidget(),
                   ],
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
