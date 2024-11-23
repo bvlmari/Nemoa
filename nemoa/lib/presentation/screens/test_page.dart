@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class TestPage extends StatefulWidget {
   static const String routename = 'TestPage';
@@ -20,12 +22,108 @@ class TestPage extends StatefulWidget {
 class _TestPageState extends State<TestPage> {
   String _message = ''; // Variable to store the message
   final player = AudioPlayer();
+  final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  bool _isRecording = false;
+  String _recordedFilePath = '';
 
   String responseMessage = '';
 
+  @override
+  void initState() {
+    super.initState();
+    _initRecorder();
+  }
+
+  Future<void> _initRecorder() async {
+    // Request microphone permission
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      throw Exception('Microphone permission not granted');
+    }
+    await _recorder.openRecorder();
+  }
+
+  Future<void> _startRecording() async {
+    Directory tempDir = await getTemporaryDirectory();
+    String tempPath = '${tempDir.path}/temp_audio.aac';
+
+    await _recorder.startRecorder(toFile: tempPath, codec: Codec.aacADTS);
+    setState(() {
+      _isRecording = true;
+    });
+  }
+
+  Future<void> _stopRecording() async {
+    String? filePath = await _recorder.stopRecorder();
+    setState(() {
+      _isRecording = false;
+      _recordedFilePath = filePath ?? '';
+    });
+    /* DEBUGGING
+    final object2 = 'Chale';
+    print(object2);
+    final player2 = AudioPlayer();
+    await player2.play(DeviceFileSource(_recordedFilePath!));
+    print("Playing recorded audio for debugging: $_recordedFilePath");
+    */
+    // Process the recorded audio (e.g., send to speech-to-text API)
+    if (_recordedFilePath.isNotEmpty) {
+      /* final object = 'Hola';
+      print(object); */
+      await _sendAudioFile(File(_recordedFilePath));
+      await _sendToGemini(_message);
+      await _textToSpeech(_message);
+    }
+  }
+
+  Future<void> _sendAudioFile(File audioFile) async {
+    const String token = 'mariano sabe';
+    const String url = 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true';
+
+    try {
+      // Read the file's bytes
+      Uint8List audioBytes = await audioFile.readAsBytes();
+
+      // Send POST request with audio file
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Token $token',
+          'Content-Type': 'audio/aac',
+        },
+        body: audioBytes,
+      );
+
+      // Process the response
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final transcription = jsonResponse['results']?['channels']?[0]?['alternatives']?[0]?['transcript'];
+
+        setState(() {
+          _message = transcription ?? 'No transcription found.';
+        });
+      } else {
+        setState(() {
+          _message = 'Failed: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _message = 'Error: $e';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _recorder.closeRecorder();
+    super.dispose();
+  }
+
+  /* Funcion funcional con audio local mp3
   // Function to send POST request
   Future<void> _sendAudioFile() async {
-    const String token = 'mariano sabe';
+    const String token = '7b9f6c1f2fbb1a47e6cf3d4b7727c94b99efdb4f';
     const String url = 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true';
 
     try {
@@ -62,7 +160,8 @@ class _TestPageState extends State<TestPage> {
         responseMessage = 'Error: $e';
       });
     }
-  }
+  } 
+  */
 
   Future<void> _sendToGemini(String prompt) async {
     try {
@@ -160,6 +259,7 @@ class _TestPageState extends State<TestPage> {
     });
   }
 
+  /* Testing
   // Function to update the message when Button B is clicked
   void _buttonBClicked() {
     setState(() {
@@ -167,6 +267,7 @@ class _TestPageState extends State<TestPage> {
       _sendAudioFile();
     });
   }
+  */
 
   void _buttonCClicked() {
     setState(() {
@@ -186,7 +287,7 @@ class _TestPageState extends State<TestPage> {
   void _megaMethod() {
     setState(() {
       _buttonAClicked();
-      _buttonBClicked();
+      //_buttonBClicked();
       _buttonCClicked();
       _buttonDClicked();
     });
@@ -203,6 +304,20 @@ class _TestPageState extends State<TestPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
+              _isRecording ? 'Recording...' : '$_message',
+              style: const TextStyle(fontSize: 20),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _isRecording ? null : _startRecording,
+              child: const Text('Start Recording'),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _isRecording ? _stopRecording : null,
+              child: const Text('Stop Recording'),
+            ),
+            Text(
               '$_message', // Displaying the message based on the button clicked
               style: TextStyle(fontSize: 20),
             ),
@@ -212,10 +327,10 @@ class _TestPageState extends State<TestPage> {
               child: Text('Play Audio'),
             ),
             SizedBox(height: 10),
-            ElevatedButton(
+            /*ElevatedButton(
               onPressed: _buttonBClicked, // When Button B is clicked
               child: Text('Speech to text'),
-            ),
+            ), */
             SizedBox(height: 10),
             ElevatedButton(
               onPressed: _buttonCClicked, // When Button B is clicked
