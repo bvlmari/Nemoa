@@ -188,7 +188,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Apariencia guardada exitosamente!'),
+            content: Text('Appearance saved successfully!'),
             backgroundColor: Colors.lightBlue,
           ),
         );
@@ -197,7 +197,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar la apariencia: $error'),
+            content: Text('Error saving appearance: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -220,7 +220,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             (appearanceData['accesorios'] as String).split(',');
       });
     }).catchError((error) {
-      print('Error al cargar la apariencia: $error');
+      print('Error loading skin: $error');
     });
   }
 
@@ -271,7 +271,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al cargar los datos: $error'),
+              content: Text('Error loading data: $error'),
               backgroundColor: Colors.red,
             ),
           );
@@ -299,7 +299,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('¡Nombre actualizado exitosamente!'),
+              content: Text('Name updated successfully!'),
               backgroundColor: Colors.lightBlue,
             ),
           );
@@ -308,7 +308,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al actualizar el nombre: $error'),
+              content: Text('Error updating name: $error'),
               backgroundColor: Colors.red,
             ),
           );
