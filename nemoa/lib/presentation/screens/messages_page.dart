@@ -12,47 +12,186 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
-  final List<String> _messages = [];
+  final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _friendName;
   String? _friendAvatarUrl;
   bool _isLoading = true;
+  int? _userId;
 
   List<String> conversationHistory = [];
 
-  void _sendMessage() async {
-    if (_controller.text.isNotEmpty) {
-      setState(() {
-        _messages.add(_controller.text);
-        conversationHistory.add("User: " + _controller.text);
-      });
-      _scrollToBottom();
+  Future<int> _getOrCreateTipoMensaje(String tipo) async {
+    final supabase = Supabase.instance.client;
 
+    try {
+      // Intentar encontrar el tipo existente
+      final existingTipo = await supabase
+          .from('TiposMensajes')
+          .select()
+          .eq('tipoMensaje', tipo)
+          .maybeSingle();
+
+      if (existingTipo != null) {
+        return existingTipo['idTipo'];
+      }
+
+      // Si no existe, crear uno nuevo
+      final newTipo = await supabase
+          .from('TiposMensajes')
+          .insert({'tipoMensaje': tipo})
+          .select()
+          .single();
+
+      return newTipo['idTipo'];
+    } catch (error) {
+      print('Error managing message type: $error');
+      throw error;
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    if (_controller.text.isNotEmpty) {
+      final messageText = _controller.text;
       _controller.clear();
 
-      // Construct the prompt with conversation history
-      final prompt = conversationHistory.join("\n");
+      // Guardar mensaje del usuario con hora
+      final now = DateTime.now();
+      await _saveMessage(messageText, true, now);
 
-      // Send the prompt to the Gemini API
-      final model = GenerativeModel(
-        model: 'gemini-1.5-flash-8b',
-        apiKey:
-            'AIzaSyC1cT5ZwB3o-zNfnkIbPkrg3nZHaIE-UHE', // Replace with your actual API key
-        systemInstruction: Content.system(
-            'You are a cat. Your name is Neko. You should always end phrases with nya. You talk spanish.'),
-        generationConfig: GenerationConfig(maxOutputTokens: 100),
-      );
-      final chat = model.startChat();
-      final content = Content.text(prompt);
+      try {
+        // Actualizar el historial de conversación
+        conversationHistory.add("User: $messageText");
 
-      final response = await chat.sendMessage(content);
+        // Construir el prompt y obtener respuesta de la API
+        final prompt = conversationHistory.join("\n");
+        final model = GenerativeModel(
+          model: 'gemini-1.5-flash-8b',
+          apiKey: 'AIzaSyDa77VcOBcUythCYrcWYkSZyRo9JIZP7HQ',
+          systemInstruction: Content.system(
+              'You are a cat. Your name is Neko. You should always end phrases with nya. You talk Spanish.'),
+          generationConfig: GenerationConfig(maxOutputTokens: 100),
+        );
+
+        final chat = model.startChat();
+        final content = Content.text(prompt);
+        final response = await chat.sendMessage(content);
+
+        // Validar y guardar la respuesta
+        if (response.text != null) {
+          final botTime = DateTime.now();
+          await _saveMessage(response.text!, false, botTime);
+
+          // Actualizar el historial de conversación
+          conversationHistory.add("Bot: ${response.text!}");
+
+          setState(() {
+            _messages.add(
+                {'text': response.text!, 'isUser': false, 'time': botTime});
+          });
+        } else {
+          throw Exception("Respuesta vacía del modelo");
+        }
+      } catch (error) {
+        print('Error al enviar mensaje: $error');
+
+        // Mostrar mensaje de error al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.toString().contains("Quota exceeded")
+                  ? "Se excedió el límite de solicitudes. Inténtalo más tarde."
+                  : "No se pudo procesar tu mensaje. Intenta de nuevo.",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      // Desplazar la vista al final
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _saveMessage(
+      String message, bool isUserMessage, DateTime time) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Obtener o crear el tipo de mensaje
+      final tipoMensajeId =
+          await _getOrCreateTipoMensaje(isUserMessage ? 'user' : 'bot');
+
+      // Guardar el mensaje en la tabla mensajes
+      await supabase
+          .from('mensajes')
+          .insert({
+            'contenidoMmensaje': message,
+            'emisor': isUserMessage ? _userId.toString() : 'bot',
+            'receptor': isUserMessage ? 'bot' : _userId.toString(),
+            'fechaEnvio': time.toIso8601String(),
+            'idTipo': tipoMensajeId,
+          })
+          .select()
+          .single();
+
+      // Actualizar el estado local
+      setState(() {
+        _messages.add({
+          'text': message,
+          'isUser': isUserMessage,
+          'time': time ?? DateTime.now(),
+        });
+        // Ordenar la lista
+        _messages.sort((a, b) {
+          final timeA = a['time'] as DateTime;
+          final timeB = b['time'] as DateTime;
+          return timeA.compareTo(timeB);
+        });
+      });
+    } catch (error) {
+      print('Error saving message: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving message: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Cargar mensajes anteriores
+      final messages = await supabase
+          .from('mensajes')
+          .select()
+          .or('emisor.eq.${_userId.toString()},receptor.eq.${_userId.toString()}')
+          .order('fechaEnvio');
 
       setState(() {
-        _messages.add(response.text ?? 'API response is null');
-        conversationHistory.add(response.text ?? 'API response is null');
+        _messages.clear();
+        for (final message in messages) {
+          _messages.add({
+            'text': message['contenidoMmensaje'],
+            'isUser': message['emisor'] == _userId.toString(),
+            'time': DateTime.tryParse(message['fechaEnvio']) ?? DateTime.now(),
+          });
+        }
+        //ordenar mensajes
+        _messages.sort((a, b) {
+          final timeA = a['time'] as DateTime;
+          final timeB = b['time'] as DateTime;
+          return timeA.compareTo(timeB);
+        });
       });
-      _scrollToBottom();
+    } catch (error) {
+      print('Error loading messages: $error');
     }
   }
 
@@ -67,8 +206,10 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
-    _scrollToBottom(); // Ensures we start at the bottom
-    _loadCurrentFriendData();
+    _loadCurrentFriendData().then((_) {
+      _loadMessages();
+    });
+    _scrollToBottom();
   }
 
   Future<void> _loadCurrentFriendData() async {
@@ -77,27 +218,26 @@ class _MessagesPageState extends State<MessagesPage> {
 
     if (user != null) {
       try {
-        // Obtener el idUsuario desde la tabla "usuarios"
         final userData = await supabase
             .from('usuarios')
             .select('idUsuario')
             .eq('auth_user_id', user.id)
             .single();
 
-        // Consulta para obtener el nombre y apariencia del amigo virtual
+        _userId = userData['idUsuario'];
+
         final friendData = await supabase.from('amigosVirtuales').select('''
+            idAmigo,
             nombre,
             Apariencias (
               Icono
             )
-          ''').eq('idUsuario', userData['idUsuario']).maybeSingle();
+          ''').eq('idUsuario', _userId!).maybeSingle();
 
-        // Verifica si se obtuvieron datos
         if (friendData != null) {
           setState(() {
-            _friendName = friendData['nombre']; // Guardar el nombre
-            _friendAvatarUrl = friendData['Apariencias']
-                ['Icono']; // Guardar el icono del avatar
+            _friendName = friendData['nombre'];
+            _friendAvatarUrl = friendData['Apariencias']['Icono'];
             _isLoading = false;
           });
         } else {
@@ -153,7 +293,7 @@ class _MessagesPageState extends State<MessagesPage> {
                     },
                   ),
                   if (_isLoading)
-                    const CircularProgressIndicator() // Indicador de carga
+                    const CircularProgressIndicator()
                   else
                     Container(
                       width: 40,
@@ -169,7 +309,7 @@ class _MessagesPageState extends State<MessagesPage> {
                                 fit: BoxFit.cover,
                               )
                             : Image.asset(
-                                'assets/images/default_avatar.png', // Avatar predeterminado
+                                'assets/images/default_avatar.png',
                                 fit: BoxFit.cover,
                               ),
                       ),
@@ -180,8 +320,7 @@ class _MessagesPageState extends State<MessagesPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _friendName ??
-                              'Amigo Desconocido', // Nombre del amigo
+                          _friendName ?? 'Amigo Desconocido',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -191,7 +330,7 @@ class _MessagesPageState extends State<MessagesPage> {
                         const Text(
                           'Online',
                           style: TextStyle(
-                            color: Colors.grey,
+                            color: Colors.black,
                             fontSize: 12,
                           ),
                         ),
@@ -209,7 +348,8 @@ class _MessagesPageState extends State<MessagesPage> {
                 padding: const EdgeInsets.all(8.0),
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
-                  final isUserMessage = index % 2 == 0;
+                  final message = _messages[index];
+                  final isUserMessage = message['isUser'];
                   final alignment = isUserMessage
                       ? Alignment.centerRight
                       : Alignment.centerLeft;
@@ -232,9 +372,25 @@ class _MessagesPageState extends State<MessagesPage> {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.grey.shade300),
                         ),
-                        child: Text(
-                          _messages[index],
-                          style: const TextStyle(color: Colors.white),
+                        child: Column(
+                          crossAxisAlignment: isUserMessage
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message['text'],
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatTime(message['time']
+                                  as DateTime?), // Usa DateTime? para prevenir errores.
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -242,7 +398,8 @@ class _MessagesPageState extends State<MessagesPage> {
                 },
               ),
             ),
-            // Bottom Input Area with Navigation
+
+            // Input Area
             Container(
               decoration: BoxDecoration(
                 color: Colors.black,
@@ -253,45 +410,41 @@ class _MessagesPageState extends State<MessagesPage> {
                   ),
                 ),
               ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline,
-                              color: Colors.white),
-                          onPressed: () {},
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            decoration: const InputDecoration(
-                              hintText: "Type your message...",
-                              hintStyle: TextStyle(color: Colors.white54),
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(color: Colors.white54),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Colors.white54),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Colors.lightBlue),
-                              ),
-                            ),
-                            style: const TextStyle(color: Colors.white),
-                            onSubmitted: (value) => _sendMessage(),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline,
+                          color: Colors.white),
+                      onPressed: () {},
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        decoration: const InputDecoration(
+                          hintText: "Type your message...",
+                          hintStyle: TextStyle(color: Colors.white54),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white54),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white54),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.lightBlue),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.mic, color: Colors.white),
-                          onPressed: () {},
-                        ),
-                      ],
+                        style: const TextStyle(color: Colors.white),
+                        onSubmitted: (value) => _sendMessage(),
+                      ),
                     ),
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(Icons.mic, color: Colors.white),
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -299,4 +452,9 @@ class _MessagesPageState extends State<MessagesPage> {
       ),
     );
   }
+}
+
+String _formatTime(DateTime? time) {
+  if (time == null) return ''; // Maneja valores null.
+  return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
 }
