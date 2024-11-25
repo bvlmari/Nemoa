@@ -17,10 +17,14 @@ class _MessagesPageState extends State<MessagesPage> {
   final ScrollController _scrollController = ScrollController();
   String? _friendName;
   String? _friendAvatarUrl;
+  String? _userName;
   bool _isLoading = true;
   int? _userId;
+  String? _userDescription;
+  String? _conversationStyle;
 
   List<String> conversationHistory = [];
+  final int maxHistoryLength = 10;
 
   Future<int> _getOrCreateTipoMensaje(String tipo) async {
     final supabase = Supabase.instance.client;
@@ -50,65 +54,114 @@ class _MessagesPageState extends State<MessagesPage> {
     }
   }
 
+  Future<void> _loadUserDataAndFriend() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // Obtener datos del usuario incluyendo el estilo conversacional
+        final userData = await supabase.from('usuarios').select('''
+              idUsuario,
+              nombre,
+              descripcion,
+              EstilosConversacionales!inner (
+                nombreEstilo
+              )
+            ''').eq('auth_user_id', user.id).single();
+
+        _userId = userData['idUsuario'];
+        _userName = userData['nombre'];
+        _userDescription = userData['descripcion'];
+        _conversationStyle =
+            userData['EstilosConversacionales']['nombreEstilo'];
+
+        // Obtener datos del amigo virtual
+        final friendData = await supabase.from('amigosVirtuales').select('''
+              nombre,
+              Apariencias (
+                Icono
+              )
+            ''').eq('idUsuario', _userId!).single();
+
+        setState(() {
+          _friendName = friendData['nombre'];
+          _friendAvatarUrl = friendData['Apariencias']['Icono'];
+          _isLoading = false;
+        });
+      } catch (error) {
+        print('Error loading data: $error');
+        setState(() {
+          _isLoading = false;
+          // Valores por defecto
+          _userName = 'Usuario';
+          _conversationStyle = 'casual';
+          _userDescription = 'Un usuario amigable';
+          _friendName = 'Amigo Virtual';
+        });
+      }
+    }
+  }
+
+  String _buildSystemPrompt() {
+    return '''Eres un amigo virtual llamado ${_friendName ?? 'Amigo'}. 
+Estás hablando con ${_userName ?? 'un usuario'}, quien se describe como: ${_userDescription ?? 'una persona amigable'}.
+Tu estilo de conversación es ${_conversationStyle ?? 'casual'}.
+Debes mantener consistencia con tu personalidad y adaptar tus respuestas al estilo conversacional indicado.
+Mantén presente el contexto de la conversación y la descripción del usuario para personalizar tus respuestas.''';
+  }
+
   Future<void> _sendMessage() async {
     if (_controller.text.isNotEmpty) {
       final messageText = _controller.text;
       _controller.clear();
 
-      // Guardar mensaje del usuario con hora
       final now = DateTime.now();
       await _saveMessage(messageText, true, now);
 
       try {
-        // Actualizar el historial de conversación
-        conversationHistory.add("User: $messageText");
+        if (conversationHistory.length >= maxHistoryLength) {
+          conversationHistory.removeRange(0, 2);
+        }
+        conversationHistory.add("${_userName}: $messageText");
 
-        // Construir el prompt y obtener respuesta de la API
-        final prompt = conversationHistory.join("\n");
         final model = GenerativeModel(
           model: 'gemini-1.5-flash-8b',
           apiKey: 'AIzaSyDa77VcOBcUythCYrcWYkSZyRo9JIZP7HQ',
-          systemInstruction: Content.system(
-              'You are a cat. Your name is Neko. You should always end phrases with nya. You talk Spanish.'),
+          systemInstruction: Content.system(_buildSystemPrompt()),
           generationConfig: GenerationConfig(maxOutputTokens: 100),
         );
 
         final chat = model.startChat();
-        final content = Content.text(prompt);
+        final content = Content.text(conversationHistory.join("\n"));
         final response = await chat.sendMessage(content);
 
-        // Validar y guardar la respuesta
         if (response.text != null) {
           final botTime = DateTime.now();
           await _saveMessage(response.text!, false, botTime);
-
-          // Actualizar el historial de conversación
-          conversationHistory.add("Bot: ${response.text!}");
+          conversationHistory.add("${_friendName}: ${response.text!}");
 
           setState(() {
             _messages.add(
                 {'text': response.text!, 'isUser': false, 'time': botTime});
           });
-        } else {
-          throw Exception("Respuesta vacía del modelo");
         }
       } catch (error) {
         print('Error al enviar mensaje: $error');
-
-        // Mostrar mensaje de error al usuario
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.toString().contains("Quota exceeded")
-                  ? "Se excedió el límite de solicitudes. Inténtalo más tarde."
-                  : "No se pudo procesar tu mensaje. Intenta de nuevo.",
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                error.toString().contains("Quota exceeded")
+                    ? "Se excedió el límite de solicitudes. Inténtalo más tarde."
+                    : "No se pudo procesar tu mensaje. Intenta de nuevo.",
+              ),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.red,
-          ),
-        );
+          );
+        }
       }
 
-      // Desplazar la vista al final
       _scrollToBottom();
     }
   }
@@ -205,7 +258,7 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentFriendData().then((_) {
+    _loadUserDataAndFriend().then((_) {
       _loadMessages();
     });
     _scrollToBottom();
