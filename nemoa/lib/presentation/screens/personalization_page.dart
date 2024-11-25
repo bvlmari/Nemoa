@@ -524,40 +524,48 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             final isSelected = _selectedVoice == voice;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: ListTile(
-                onTap: () {
-                  setState(() {
-                    _selectedVoice = voice;
-                  });
-                },
-                shape: RoundedRectangleBorder(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected ? _selectedColor : Colors.grey.shade800,
                   borderRadius: BorderRadius.circular(15),
                 ),
-                tileColor: isSelected ? _selectedColor : Colors.grey.shade800,
-                leading: Icon(
-                  isSelected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                  color: Colors.white,
-                ),
-                title: Text(
-                  voice,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
-                trailing: IconButton(
-                  icon: Icon(
-                    Icons.volume_up,
-                    color: Colors.white.withOpacity(0.7),
-                  ),
-                  onPressed: () {
-                    final audioUrl = _voiceAudioSamples[voice];
-                    if (audioUrl != null) {
-                      _playAudio(audioUrl);
-                    }
-                  },
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    // Ícono de selección
+                    Icon(
+                      isSelected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 16),
+                    // Título (Nombre de la voz)
+                    Expanded(
+                      child: Text(
+                        voice,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                        overflow:
+                            TextOverflow.ellipsis, // Truncar si es muy largo
+                      ),
+                    ),
+                    // Botón de volumen
+                    IconButton(
+                      icon: Icon(
+                        Icons.volume_up,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                      onPressed: () {
+                        final audioUrl = _voiceAudioSamples[voice];
+                        if (audioUrl != null) {
+                          _playAudio(audioUrl);
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
             );
