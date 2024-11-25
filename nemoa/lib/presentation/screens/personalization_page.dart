@@ -22,7 +22,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   String? _selectedIconUrl;
   //String? _selectedAccessories;
   final player = AudioPlayer();
-
+  TextEditingController _nameController = TextEditingController(text: 'Lisa');
+  bool _isEditingName = false;
   final List<Map<String, dynamic>> _accessories = [
     {
       'name': 'Flor',
@@ -110,6 +111,18 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   'Shimmer': 'ShimmerTest.mp3',
 };
 
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentFriendData();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _currentIndex = index;
@@ -168,32 +181,34 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           // 4a. Actualizar el amigo virtual existente
           await supabase.from('amigosVirtuales').update({
             'idApariencia': appearanceResponse['idApariencia'],
+            'nombre': _nameController.text,
           }).eq('idAmigo', existingFriend['idAmigo']);
         } else {
           // 4b. Crear un nuevo amigo virtual
           await supabase.from('amigosVirtuales').insert({
-            'nombre': 'Lisa',
+            'nombre': _nameController.text,
             'idUsuario': userData['idUsuario'],
             'idApariencia': appearanceResponse['idApariencia'],
           });
         }
+
+        // 5. Recargar los datos después de guardar
+        await _loadCurrentFriendData();
       }
 
-      // Mostrar mensaje de éxito
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Apariencia guardada exitosamente!'),
+            content: Text('Appearance saved successfully!'),
             backgroundColor: Colors.lightBlue,
           ),
         );
       }
     } catch (error) {
-      // Mostrar mensaje de error
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar la apariencia: $error'),
+            content: Text('Error saving appearance: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -216,7 +231,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             (appearanceData['accesorios'] as String).split(',');
       });
     }).catchError((error) {
-      print('Error al cargar la apariencia: $error');
+      print('Error loading skin: $error');
     });
   }
 
@@ -224,6 +239,99 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   // Load and play an audio file from the assets
   await player.play(AssetSource(audioName));
 }
+  
+  Future<void> _loadCurrentFriendData() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // 1. Obtener el idUsuario
+        final userData = await supabase
+            .from('usuarios')
+            .select('idUsuario')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        // 2. Obtener los datos del amigo virtual incluyendo la apariencia
+        final friendData = await supabase.from('amigosVirtuales').select('''
+              *,
+              Apariencias (
+                Icono,
+                accesorios
+              )
+            ''').eq('idUsuario', userData['idUsuario']).maybeSingle();
+
+        if (friendData != null && mounted) {
+          setState(() {
+            // Actualizar el nombre
+            _nameController.text = friendData['nombre'];
+
+            // Actualizar la apariencia
+            if (friendData['Apariencias'] != null) {
+              _selectedIconUrl = friendData['Apariencias']['Icono'];
+
+              // Actualizar accesorios si existen
+              if (friendData['Apariencias']['accesorios'] != null) {
+                _selectedAccessories = [
+                  friendData['Apariencias']['accesorios']
+                ];
+              } else {
+                _selectedAccessories = [];
+              }
+            }
+          });
+        }
+      } catch (error) {
+        print('Error loading friend data: $error');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading data: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _updateFriendName(String newName) async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        final userData = await supabase
+            .from('usuarios')
+            .select('idUsuario')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        await supabase
+            .from('amigosVirtuales')
+            .update({'nombre': newName}).eq('idUsuario', userData['idUsuario']);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Name updated successfully!'),
+              backgroundColor: Colors.lightBlue,
+            ),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating name: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   Widget _buildSectionContent() {
     switch (_selectedSection) {
@@ -430,12 +538,13 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
       ),
       child: Stack(
         children: [
-          // Si hay un ícono seleccionado, mostrarlo
           if (_selectedIconUrl != null)
             ClipOval(
               child: Image.network(
                 _selectedIconUrl!,
                 fit: BoxFit.cover,
+                width: 120,
+                height: 120,
                 errorBuilder: (context, error, stackTrace) {
                   return const Icon(
                     Icons.error_outline,
@@ -443,30 +552,92 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                     size: 40,
                   );
                 },
-              ),
-            ),
-          // Si hay un accesorio seleccionado, mostrarlo encima del ícono
-          if (_selectedAccessories.isNotEmpty)
-            Center(
-              child: Image.network(
-                _accessories.firstWhere((accessory) =>
-                    accessory['name'] ==
-                    _selectedAccessories.first)['imageUrl'],
-                color: Colors.white,
-                height: 40,
-                width: 40,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.error_outline,
-                    color: Colors.white,
-                    size: 30,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
                   );
                 },
               ),
             ),
+          if (_selectedAccessories.isNotEmpty)
+            Positioned.fill(
+              child: Center(
+                child: Image.network(
+                  _accessories.firstWhere((accessory) =>
+                      accessory['name'] ==
+                      _selectedAccessories.first)['imageUrl'],
+                  color: Colors.white,
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.error_outline,
+                      color: Colors.white,
+                      size: 30,
+                    );
+                  },
+                ),
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildNameWidget() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isEditingName = true;
+        });
+      },
+      child: _isEditingName
+          ? Container(
+              width: 150,
+              child: TextField(
+                controller: _nameController,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Roboto',
+                ),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  border: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                  ),
+                ),
+                onSubmitted: (value) {
+                  if (value.isNotEmpty) {
+                    _updateFriendName(value);
+                    setState(() {
+                      _isEditingName = false;
+                    });
+                  }
+                },
+              ),
+            )
+          : Text(
+              _nameController.text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+                color: Colors.white,
+              ),
+            ),
     );
   }
 
@@ -486,20 +657,12 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                 child: Column(
                   children: [
                     _buildPreviewAvatar(),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Lisa',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Roboto',
-                        color: Colors.white,
-                      ),
-                    ),
+                    const SizedBox(height: 20),
+                    _buildNameWidget(),
                   ],
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [

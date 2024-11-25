@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:nemoa/presentation/screens/main_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MessagesPage extends StatefulWidget {
   static const String routename = 'MessagesPage';
@@ -10,47 +12,189 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
-  final List<String> _messages = [];
+  final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  String? _friendName;
+  String? _friendAvatarUrl;
+  bool _isLoading = true;
+  int? _userId;
 
-List<String> conversationHistory = [];
+  List<String> conversationHistory = [];
 
-void _sendMessage() async {
-  if (_controller.text.isNotEmpty) {
-    setState(() {
-      _messages.add(_controller.text);
-      conversationHistory.add("User: " + _controller.text);
-    });
-    _scrollToBottom();
+  Future<int> _getOrCreateTipoMensaje(String tipo) async {
+    final supabase = Supabase.instance.client;
 
+    try {
+      // Intentar encontrar el tipo existente
+      final existingTipo = await supabase
+          .from('TiposMensajes')
+          .select()
+          .eq('tipoMensaje', tipo)
+          .maybeSingle();
 
-    _controller.clear();
+      if (existingTipo != null) {
+        return existingTipo['idTipo'];
+      }
 
-    // Construct the prompt with conversation history
-    final prompt = conversationHistory.join("\n");
-
-    // Send the prompt to the Gemini API
-    final model = GenerativeModel(
-      model: 'gemini-1.5-flash-8b',
-      apiKey: 'Deprecated', // Replace with your actual API key
-      systemInstruction: Content.system('You are a cat. Your name is Neko. You should always end phrases with nya. You talk spanish.'),
-      generationConfig: GenerationConfig(maxOutputTokens: 100),
-    );
-    final chat = model.startChat();
-    final content = Content.text(prompt);
-
-    final response = await chat.sendMessage(content);
-
-    setState(() {
-      _messages.add(response.text ?? 'API response is null');
-      conversationHistory.add(response.text ?? 'API response is null');
-    });
-    _scrollToBottom();
+      // Si no existe, crear uno nuevo
+      final newTipo = await supabase
+          .from('TiposMensajes')
+          .insert({'tipoMensaje': tipo})
+          .select()
+          .single();
+      return newTipo['idTipo'];
+    } catch (error) {
+      print('Error managing message type: $error');
+      throw error;
+    }
   }
-}
 
-void _scrollToBottom() {
+  Future<void> _sendMessage() async {
+    if (_controller.text.isNotEmpty) {
+      final messageText = _controller.text;
+      _controller.clear();
+
+      // Guardar mensaje del usuario con hora
+      final now = DateTime.now();
+      await _saveMessage(messageText, true, now);
+
+      try {
+        // Actualizar el historial de conversación
+        conversationHistory.add("User: $messageText");
+
+        // Construir el prompt y obtener respuesta de la API
+        final prompt = conversationHistory.join("\n");
+        final model = GenerativeModel(
+          model: 'gemini-1.5-flash-8b',
+          apiKey: 'AIzaSyDa77VcOBcUythCYrcWYkSZyRo9JIZP7HQ',
+          systemInstruction: Content.system(
+              'You are a cat. Your name is Neko. You should always end phrases with nya. You talk Spanish.'),
+          generationConfig: GenerationConfig(maxOutputTokens: 100),
+        );
+
+        final chat = model.startChat();
+        final content = Content.text(prompt);
+        final response = await chat.sendMessage(content);
+
+        // Validar y guardar la respuesta
+        if (response.text != null) {
+          final botTime = DateTime.now();
+          await _saveMessage(response.text!, false, botTime);
+
+          // Actualizar el historial de conversación
+          conversationHistory.add("Bot: ${response.text!}");
+
+          setState(() {
+            _messages.add(
+                {'text': response.text!, 'isUser': false, 'time': botTime});
+          });
+        } else {
+          throw Exception("Respuesta vacía del modelo");
+        }
+      } catch (error) {
+        print('Error al enviar mensaje: $error');
+
+        // Mostrar mensaje de error al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.toString().contains("Quota exceeded")
+                  ? "Se excedió el límite de solicitudes. Inténtalo más tarde."
+                  : "No se pudo procesar tu mensaje. Intenta de nuevo.",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      // Desplazar la vista al final
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _saveMessage(
+      String message, bool isUserMessage, DateTime time) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Obtener o crear el tipo de mensaje
+      final tipoMensajeId =
+          await _getOrCreateTipoMensaje(isUserMessage ? 'user' : 'bot');
+
+      // Guardar el mensaje en la tabla mensajes
+      await supabase
+          .from('mensajes')
+          .insert({
+            'contenidoMmensaje': message,
+            'emisor': isUserMessage ? _userId.toString() : 'bot',
+            'receptor': isUserMessage ? 'bot' : _userId.toString(),
+            'fechaEnvio': time.toIso8601String(),
+            'idTipo': tipoMensajeId,
+          })
+          .select()
+          .single();
+
+      // Actualizar el estado local
+      setState(() {
+        _messages.add({
+          'text': message,
+          'isUser': isUserMessage,
+          'time': time ?? DateTime.now(),
+        });
+        // Ordenar la lista
+        _messages.sort((a, b) {
+          final timeA = a['time'] as DateTime;
+          final timeB = b['time'] as DateTime;
+          return timeA.compareTo(timeB);
+        });
+      });
+    } catch (error) {
+      print('Error saving message: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving message: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Cargar mensajes anteriores
+      final messages = await supabase
+          .from('mensajes')
+          .select()
+          .or('emisor.eq.${_userId.toString()},receptor.eq.${_userId.toString()}')
+          .order('fechaEnvio');
+
+      setState(() {
+        _messages.clear();
+        for (final message in messages) {
+          _messages.add({
+            'text': message['contenidoMmensaje'],
+            'isUser': message['emisor'] == _userId.toString(),
+            'time': DateTime.tryParse(message['fechaEnvio']) ?? DateTime.now(),
+          });
+        }
+        //ordenar mensajes
+        _messages.sort((a, b) {
+          final timeA = a['time'] as DateTime;
+          final timeB = b['time'] as DateTime;
+          return timeA.compareTo(timeB);
+        });
+      });
+    } catch (error) {
+      print('Error loading messages: $error');
+    }
+  }
+
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -58,93 +202,258 @@ void _scrollToBottom() {
     });
   }
 
-@override
-void initState() {
-  super.initState();
-  _scrollToBottom(); // Ensures we start at the bottom
-}
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentFriendData().then((_) {
+      _loadMessages();
+    });
+    _scrollToBottom();
+  }
+
+  Future<void> _loadCurrentFriendData() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        final userData = await supabase
+            .from('usuarios')
+            .select('idUsuario')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        _userId = userData['idUsuario'];
+
+        final friendData = await supabase.from('amigosVirtuales').select('''
+            idAmigo,
+            nombre,
+            Apariencias (
+              Icono
+            )
+          ''').eq('idUsuario', _userId!).maybeSingle();
+
+        if (friendData != null) {
+          setState(() {
+            _friendName = friendData['nombre'];
+            _friendAvatarUrl = friendData['Apariencias']['Icono'];
+            _isLoading = false;
+          });
+        } else {
+          print("No se encontraron datos del amigo virtual");
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      } catch (error) {
+        print('Error loading friend data: $error');
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading data: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Virtual Friend"),
-        centerTitle: true,
-      ),
       backgroundColor: Colors.black,
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              //reverse: true, reversea el orden de los mensajes
-              controller: _scrollController,
-              padding: const EdgeInsets.all(8.0),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final isUserMessage = index % 2 == 0;
-                final alignment = isUserMessage ? Alignment.centerRight : Alignment.centerLeft;
-                final backgroundColor = isUserMessage ? const Color.fromARGB(255, 189, 187, 187) : const Color.fromARGB(255, 145, 160, 186);
-
-                return Align(
-                  alignment: alignment,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.7, // Limits message width to 70% of screen
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      decoration: BoxDecoration(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Text(
-                        _messages[index],
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  )
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: "Type your message...",
-                      hintStyle: TextStyle(color: Colors.white54),
-                      border: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white54),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.lightBlue),
-                      ),
-                    ),
-                      style: const TextStyle(
-                      color: Colors.white, // Match the message text color
-                      // Other text styles like font family, size, etc.
-                    ),
-                    onSubmitted: (value) => _sendMessage(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom App Bar
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.grey[800]!,
+                    width: 0.5,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(
+                          context, MainPage.routename);
+                    },
+                  ),
+                  if (_isLoading)
+                    const CircularProgressIndicator()
+                  else
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.blue, width: 2),
+                      ),
+                      child: ClipOval(
+                        child: _friendAvatarUrl != null
+                            ? Image.network(
+                                _friendAvatarUrl!,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.asset(
+                                'assets/images/default_avatar.png',
+                                fit: BoxFit.cover,
+                              ),
+                      ),
+                    ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _friendName ?? 'Amigo Desconocido',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Text(
+                          'Online',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            // Chat Messages
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(8.0),
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final message = _messages[index];
+                  final isUserMessage = message['isUser'];
+                  final alignment = isUserMessage
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft;
+                  final backgroundColor = isUserMessage
+                      ? const Color.fromARGB(255, 189, 187, 187)
+                      : const Color.fromARGB(255, 145, 160, 186);
+
+                  return Align(
+                    alignment: alignment,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.7,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 12),
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: backgroundColor,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: isUserMessage
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message['text'],
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatTime(message['time']
+                                  as DateTime?), // Usa DateTime? para prevenir errores.
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Input Area
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.grey[800]!,
+                    width: 0.5,
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline,
+                          color: Colors.white),
+                      onPressed: () {},
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        decoration: const InputDecoration(
+                          hintText: "Type your message...",
+                          hintStyle: TextStyle(color: Colors.white54),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white54),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white54),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.lightBlue),
+                          ),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                        onSubmitted: (value) => _sendMessage(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.mic, color: Colors.white),
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+String _formatTime(DateTime? time) {
+  if (time == null) return ''; // Maneja valores null.
+  return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
 }

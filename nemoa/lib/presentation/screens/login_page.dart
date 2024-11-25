@@ -40,7 +40,7 @@ class _LoginPageState extends State<LoginPage>
   Future<void> _signIn() async {
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.isEmpty) {
-      _showError('Por favor, completa todos los campos');
+      _showError('Please complete all fields');
       return;
     }
 
@@ -54,7 +54,7 @@ class _LoginPageState extends State<LoginPage>
       );
 
       if (response.user == null) {
-        throw 'Error de autenticación';
+        throw 'Authentication error';
       }
 
       // 2. Verificar si el usuario existe en la tabla datosInicio
@@ -65,7 +65,7 @@ class _LoginPageState extends State<LoginPage>
           .single();
 
       if (userData == null) {
-        throw 'Usuario no encontrado en la base de datos';
+        throw 'User not found in database';
       }
 
       // 3. Actualizar el estado de sesión en la tabla usuarios
@@ -77,7 +77,7 @@ class _LoginPageState extends State<LoginPage>
         // 4. Mostrar mensaje de éxito y navegar a la página principal
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Inicio de sesión exitoso!'),
+            content: Text('Login successful!'),
             backgroundColor: Colors.lightBlue,
           ),
         );
@@ -85,7 +85,7 @@ class _LoginPageState extends State<LoginPage>
       }
     } catch (e) {
       if (mounted) {
-        _showError('Correo o contraseña incorrectos');
+        _showError('Incorrect email or password');
       }
     } finally {
       if (mounted) {
