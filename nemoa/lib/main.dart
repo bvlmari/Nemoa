@@ -28,6 +28,7 @@ void main() async {
 
 // Para usar Supabase en cualquier parte de la app:
 //final supabase = Supabase.instance.client;
+final GlobalKey<TestPageState> testPageKey = GlobalKey<TestPageState>();
 
 //Rutas
 class MyApp extends StatelessWidget {
@@ -59,7 +60,7 @@ class MyApp extends StatelessWidget {
         MessagesPage.routename: (context) => const MessagesPage(),
         PersonalizationPage.routename: (context) => const PersonalizationPage(),
         UserProfilePage.routename: (context) => const UserProfilePage(),
-        TestPage.routename: (context) => const TestPage(),
+        TestPage.routename: (context) => TestPage(key: testPageKey),
         ForgotPasswordPage.routename: (context) => const ForgotPasswordPage(),
       },
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
 import 'package:nemoa/presentation/screens/custom_header.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class PersonalizationPage extends StatefulWidget {
   static const String routename = 'PersonalizationPage';
@@ -20,6 +21,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   List<String> _selectedAccessories = [];
   String? _selectedIconUrl;
   //String? _selectedAccessories;
+  final player = AudioPlayer();
   TextEditingController _nameController = TextEditingController(text: 'Lisa');
   bool _isEditingName = false;
   final List<Map<String, dynamic>> _accessories = [
@@ -98,7 +100,16 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     },
   ];
 
-  final List<String> _voiceOptions = ['Voz 1', 'Voz 2', 'Voz 3', 'Voz 4'];
+  final List<String> _voiceOptions = ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'];
+
+  final Map<String, String> _voiceAudioSamples = {
+  'Alloy': 'AlloyTest.mp3',
+  'Echo': 'EchoTest.mp3',
+  'Fable': 'FableTest.mp3',
+  'Onyx': 'OnyxTest.mp3',
+  'Nova': 'NovaTest.mp3',
+  'Shimmer': 'ShimmerTest.mp3',
+};
 
   @override
   void initState() {
@@ -224,6 +235,11 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     });
   }
 
+  void _playAudio(String audioName) async {
+  // Load and play an audio file from the assets
+  await player.play(AssetSource(audioName));
+}
+  
   Future<void> _loadCurrentFriendData() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -472,9 +488,18 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                     fontSize: 16,
                   ),
                 ),
-                trailing: Icon(
-                  Icons.volume_up,
-                  color: Colors.white.withOpacity(0.7),
+                trailing: IconButton(
+                  icon: Icon(
+                    Icons.volume_up,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  onPressed: () async {
+                    // Get the corresponding audio file name for the voice
+                    final audioFileName = _voiceAudioSamples[voice];
+                    if (audioFileName != null) {
+                      _playAudio(audioFileName);
+                    }
+                  },
                 ),
               ),
             );

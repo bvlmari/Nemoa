@@ -43,7 +43,6 @@ class _MessagesPageState extends State<MessagesPage> {
           .insert({'tipoMensaje': tipo})
           .select()
           .single();
-
       return newTipo['idTipo'];
     } catch (error) {
       print('Error managing message type: $error');

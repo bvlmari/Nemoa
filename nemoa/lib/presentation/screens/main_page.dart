@@ -24,6 +24,8 @@ class _MainPageState extends State<MainPage>
   String? _accessory;
   bool _isLoading = true;
 
+  final GlobalKey<TestPageState> testPageKey = GlobalKey<TestPageState>();
+
   @override
   void initState() {
     super.initState();
@@ -198,11 +200,18 @@ class _MainPageState extends State<MainPage>
   void _onCircleTapped() {
     setState(() {
       _isLightOn = !_isLightOn;
+
+      if (testPageKey.currentState != null) {
+      print('Calling toggleRecording from TestPage');
+      testPageKey.currentState?.toggleRecording();
+    } else {
+      print('testPageKey.currentState is null');
+    }
       
-      Navigator.pushNamed(
+      /*Navigator.pushNamed(
         context,
         TestPage.routename,
-      );
+      ); */
     });
 
     if (_isLightOn) {
@@ -239,6 +248,10 @@ class _MainPageState extends State<MainPage>
             ),
             const SizedBox(height: 20),
             const Spacer(),
+            Offstage(
+              offstage: true, // Keeps TestPage hidden
+              child: TestPage(key: testPageKey),
+            ),
           ],
         ),
       ),
