@@ -17,10 +17,11 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   int _currentIndex = 0;
   Color _selectedColor = Colors.blue;
   int _selectedSection = 0;
-  String _selectedVoice = 'Voz 1';
+  String _selectedVoice = 'Alloy';
   List<String> _selectedAccessories = [];
   String? _selectedIconUrl;
   //String? _selectedAccessories;
+  bool _isLoading = true;
   final player = AudioPlayer();
   TextEditingController _nameController = TextEditingController(text: 'Lisa');
   bool _isEditingName = false;
@@ -29,26 +30,6 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
       'name': 'Flor',
       'imageUrl':
           'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/flor-removebg-preview.png'
-    },
-    {
-      'name': 'Lazo rosa',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lazo-removebg-preview.png'
-    },
-    {
-      'name': 'Lazo rojo',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lazo_rojo-removebg-preview.png'
-    },
-    {
-      'name': 'Lentes 1',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lentes1-removebg-preview.png'
-    },
-    {
-      'name': 'Lentes 2',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lentes-removebg-preview.png'
     },
     {
       'name': 'sombrero',
@@ -100,16 +81,20 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     },
   ];
 
-  final List<String> _voiceOptions = ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'];
-
   final Map<String, String> _voiceAudioSamples = {
-  'Alloy': 'AlloyTest.mp3',
-  'Echo': 'EchoTest.mp3',
-  'Fable': 'FableTest.mp3',
-  'Onyx': 'OnyxTest.mp3',
-  'Nova': 'NovaTest.mp3',
-  'Shimmer': 'ShimmerTest.mp3',
-};
+    'Alloy':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/AlloyTest.mp3?t=2024-11-25T10%3A06%3A51.915Z',
+    'Echo':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/EchoTest.mp3?t=2024-11-25T10%3A07%3A05.681Z',
+    'Fable':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/FableTest.mp3',
+    'Onyx':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/OnyxTest.mp3?t=2024-11-25T10%3A08%3A17.746Z',
+    'Nova':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/NovaTest.mp3?t=2024-11-25T10%3A07%3A34.950Z',
+    'Shimmer':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/ShimmerTest.mp3?t=2024-11-25T10%3A08%3A43.103Z',
+  };
 
   @override
   void initState() {
@@ -120,6 +105,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    player.dispose();
     super.dispose();
   }
 
@@ -150,65 +136,110 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     final user = supabase.auth.currentUser;
 
     try {
-      // 1. Guardar la apariencia
-      final appearanceResponse = await supabase
-          .from('Apariencias')
-          .insert({
-            'Icono': _selectedIconUrl,
-            'accesorios': _selectedAccessories.isNotEmpty
-                ? _selectedAccessories.first
-                : null,
-          })
-          .select()
-          .single();
-
       if (user != null) {
-        // 2. Obtener el idUsuario
+        // 1. Obtener el idUsuario
         final userData = await supabase
             .from('usuarios')
             .select('idUsuario')
             .eq('auth_user_id', user.id)
             .single();
 
-        // 3. Verificar si el usuario ya tiene un amigo virtual
-        final existingFriend = await supabase
-            .from('amigosVirtuales')
-            .select()
-            .eq('idUsuario', userData['idUsuario'])
-            .maybeSingle();
+        // 2. Verificar si el usuario ya tiene un amigo virtual y obtener sus IDs relacionados
+        final existingFriend = await supabase.from('amigosVirtuales').select('''
+            *,
+            Apariencias (
+              idApariencia
+            ),
+            Voces (
+              idVoz
+            )
+          ''').eq('idUsuario', userData['idUsuario']).maybeSingle();
 
+        int? idApariencia;
+        int? idVoz;
+
+        // 3. Manejar la voz
+        if (existingFriend != null && existingFriend['idVoz'] != null) {
+          // Actualizar la voz existente
+          await supabase.from('Voces').update({
+            'tono': _selectedVoice,
+            // 'acento': defaultAccent,
+            // 'velocidad': defaultSpeed,
+          }).eq('idVoz', existingFriend['idVoz']);
+          idVoz = existingFriend['idVoz'];
+        } else {
+          // Crear nueva voz solo si es necesario
+          final voiceResponse = await supabase
+              .from('Voces')
+              .insert({
+                'tono': _selectedVoice,
+              })
+              .select()
+              .single();
+          idVoz = voiceResponse['idVoz'];
+        }
+
+        // 4. Manejar la apariencia
+        if (existingFriend != null && existingFriend['idApariencia'] != null) {
+          // Actualizar la apariencia existente
+          await supabase.from('Apariencias').update({
+            'Icono': _selectedIconUrl,
+            'accesorios': _selectedAccessories.isNotEmpty
+                ? _selectedAccessories.first
+                : null,
+          }).eq('idApariencia', existingFriend['idApariencia']);
+          idApariencia = existingFriend['idApariencia'];
+        } else {
+          // Crear nueva apariencia solo si es necesario
+          final appearanceResponse = await supabase
+              .from('Apariencias')
+              .insert({
+                'Icono': _selectedIconUrl,
+                'accesorios': _selectedAccessories.isNotEmpty
+                    ? _selectedAccessories.first
+                    : null,
+              })
+              .select()
+              .single();
+          idApariencia = appearanceResponse['idApariencia'];
+        }
+
+        // 5. Actualizar o crear el amigo virtual
         if (existingFriend != null) {
-          // 4a. Actualizar el amigo virtual existente
+          // Actualizar amigo virtual existente
           await supabase.from('amigosVirtuales').update({
-            'idApariencia': appearanceResponse['idApariencia'],
             'nombre': _nameController.text,
+            'idApariencia': idApariencia,
+            'idVoz': idVoz,
           }).eq('idAmigo', existingFriend['idAmigo']);
         } else {
-          // 4b. Crear un nuevo amigo virtual
+          // Crear nuevo amigo virtual
           await supabase.from('amigosVirtuales').insert({
             'nombre': _nameController.text,
             'idUsuario': userData['idUsuario'],
-            'idApariencia': appearanceResponse['idApariencia'],
+            'idApariencia': idApariencia,
+            'idVoz': idVoz,
           });
         }
 
-        // 5. Recargar los datos después de guardar
+        // 6. Recargar los datos
         await _loadCurrentFriendData();
-      }
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Appearance saved successfully!'),
-            backgroundColor: Colors.lightBlue,
-          ),
-        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Changes saved successfully!'),
+              backgroundColor: Colors.lightBlue,
+            ),
+          );
+        }
       }
     } catch (error) {
+      print('Error saving changes: $error');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving appearance: $error'),
+            content: Text('Error saving changes: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -235,11 +266,29 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     });
   }
 
-  void _playAudio(String audioName) async {
-  // Load and play an audio file from the assets
-  await player.play(AssetSource(audioName));
-}
-  
+  Future<void> _playAudio(String audioUrl) async {
+    try {
+      // Stop any currently playing audio
+      await player.stop();
+
+      // Create a Source from the URL
+      final source = UrlSource(audioUrl);
+
+      // Play the audio
+      await player.play(source);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error playing audio: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('Error playing audio: $e');
+    }
+  }
+
   Future<void> _loadCurrentFriendData() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -253,14 +302,19 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             .eq('auth_user_id', user.id)
             .single();
 
-        // 2. Obtener los datos del amigo virtual incluyendo la apariencia
+        // 2. Obtener los datos del amigo virtual incluyendo la apariencia y la voz
         final friendData = await supabase.from('amigosVirtuales').select('''
-              *,
-              Apariencias (
-                Icono,
-                accesorios
-              )
-            ''').eq('idUsuario', userData['idUsuario']).maybeSingle();
+            *,
+            Apariencias (
+              Icono,
+              accesorios
+            ),
+            Voces (
+              tono,
+              acento,
+              velocidad
+            )
+          ''').eq('idUsuario', userData['idUsuario']).maybeSingle();
 
         if (friendData != null && mounted) {
           setState(() {
@@ -271,7 +325,6 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             if (friendData['Apariencias'] != null) {
               _selectedIconUrl = friendData['Apariencias']['Icono'];
 
-              // Actualizar accesorios si existen
               if (friendData['Apariencias']['accesorios'] != null) {
                 _selectedAccessories = [
                   friendData['Apariencias']['accesorios']
@@ -280,6 +333,12 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                 _selectedAccessories = [];
               }
             }
+
+            // Actualizar la voz
+            if (friendData['Voces'] != null &&
+                friendData['Voces']['tono'] != null) {
+              _selectedVoice = friendData['Voces']['tono'];
+            }
           });
         }
       } catch (error) {
@@ -287,7 +346,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error loading data: $error'),
+              content: Text('Error cargando datos: $error'),
               backgroundColor: Colors.red,
             ),
           );
@@ -461,7 +520,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
       case 2: // Voz
         return Column(
-          children: _voiceOptions.map((voice) {
+          children: _voiceAudioSamples.keys.map((voice) {
             final isSelected = _selectedVoice == voice;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -493,11 +552,10 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                     Icons.volume_up,
                     color: Colors.white.withOpacity(0.7),
                   ),
-                  onPressed: () async {
-                    // Get the corresponding audio file name for the voice
-                    final audioFileName = _voiceAudioSamples[voice];
-                    if (audioFileName != null) {
-                      _playAudio(audioFileName);
+                  onPressed: () {
+                    final audioUrl = _voiceAudioSamples[voice];
+                    if (audioUrl != null) {
+                      _playAudio(audioUrl);
                     }
                   },
                 ),

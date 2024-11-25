@@ -27,6 +27,47 @@ class _UserProfilePageState extends State<UserProfilePage> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // Paso 1: Obtener datos del usuario desde la base de datos
+        final userRecord = await Supabase.instance.client
+            .from('usuarios')
+            .select('nombre, descripcion, idEstilo')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        if (userRecord != null) {
+          // Paso 2: Obtener el nombre del estilo conversacional
+          final estiloResponse = await Supabase.instance.client
+              .from('EstilosConversacionales')
+              .select('nombreEstilo')
+              .eq('idEstilo', userRecord['idEstilo'])
+              .single();
+
+          setState(() {
+            _nameController.text = userRecord['nombre'] ?? '';
+            _aboutController.text = userRecord['descripcion'] ?? '';
+            _responseStyleController.text =
+                estiloResponse?['nombreEstilo'] ?? '';
+          });
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar datos: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (_formKey.currentState?.validate() ?? false) {
       final user = Supabase.instance.client.auth.currentUser;
