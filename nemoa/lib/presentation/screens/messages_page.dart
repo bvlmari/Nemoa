@@ -122,7 +122,7 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
       setState(() {
         _messages.add({'text': messageText, 'isUser': true, 'time': now});
       });
-      _scrollToBottom();
+      _scrollToBottom(); // Desplazar al final después de agregar el mensaje del usuario.
 
       // Guardar mensaje
       await _saveMessage(messageText, true, now);
@@ -154,16 +154,17 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
             _messages.add(
                 {'text': response.text!, 'isUser': false, 'time': botTime});
           });
+          _scrollToBottom(); // Desplazar al final después de recibir la respuesta del bot.
         }
       } catch (error) {
-        print('Error al enviar mensaje: $error');
+        print('Error sending message:: $error');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 error.toString().contains("Quota exceeded")
-                    ? "Se excedió el límite de solicitudes. Inténtalo más tarde."
-                    : "No se pudo procesar tu mensaje. Intenta de nuevo.",
+                    ? "Request limit exceeded. Please try again later."
+                    : "Your message could not be processed. Please try again.",
               ),
               backgroundColor: Colors.red,
             ),
@@ -227,13 +228,16 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
             'time': DateTime.tryParse(message['fechaEnvio']) ?? DateTime.now(),
           });
         }
-        //ordenar mensajes
+        // Ordenar mensajes
         _messages.sort((a, b) {
           final timeA = a['time'] as DateTime;
           final timeB = b['time'] as DateTime;
           return timeA.compareTo(timeB);
         });
       });
+
+      // Desplazar al final después de cargar los mensajes
+      _scrollToBottom();
     } catch (error) {
       print('Error loading messages: $error');
     }
@@ -285,7 +289,7 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
             _isLoading = false;
           });
         } else {
-          print("No se encontraron datos del amigo virtual");
+          print("No data found for the virtual friend");
           setState(() {
             _isLoading = false;
           });
@@ -364,17 +368,17 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _friendName ?? 'Amigo Desconocido',
+                          _friendName ?? 'Unknown Friend',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Online',
                           style: TextStyle(
-                            color: Colors.black,
+                            color: Colors.grey[400],
                             fontSize: 12,
                           ),
                         ),
