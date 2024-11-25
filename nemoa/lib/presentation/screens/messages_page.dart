@@ -33,7 +33,7 @@ void _sendMessage() async {
     // Send the prompt to the Gemini API
     final model = GenerativeModel(
       model: 'gemini-1.5-flash-8b',
-      apiKey: 'AIzaSyC1cT5ZwB3o-zNfnkIbPkrg3nZHaIE-UHE', // Replace with your actual API key
+      apiKey: 'Deprecated', // Replace with your actual API key
       systemInstruction: Content.system('You are a cat. Your name is Neko. You should always end phrases with nya. You talk spanish.'),
       generationConfig: GenerationConfig(maxOutputTokens: 100),
     );
