@@ -11,15 +11,18 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:http_parser/http_parser.dart';
+
 class TestPage extends StatefulWidget {
   static const String routename = 'TestPage';
-  const TestPage({super.key});
+  const TestPage({Key? key}) : super(key: key); // Accepts GlobalKey
 
   @override
-  _TestPageState createState() => _TestPageState();
+  TestPageState createState() => TestPageState();
 }
 
-class _TestPageState extends State<TestPage> {
+class TestPageState extends State<TestPage> {
+  final String apiKey = 'mariano sabe';
   String _message = ''; // Variable to store the message
   final player = AudioPlayer();
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
@@ -43,11 +46,39 @@ class _TestPageState extends State<TestPage> {
     await _recorder.openRecorder();
   }
 
+  Future<void> toggleRecording() async {
+    const object = 'Recording button clicked';
+    debugPrint('Transcription: $object');
+    if (_isRecording) {
+      // Stop recording
+      String? filePath = await _recorder.stopRecorder();
+      setState(() {
+        _isRecording = false;
+        _recordedFilePath = filePath ?? '';
+      });
+      // Process the recorded audio
+      if (_recordedFilePath.isNotEmpty) {
+        await _transcribeAudio(File(_recordedFilePath));
+        await sendMessageToOpenAI(_message);
+        await _textToSpeech(_message);
+      }
+    } else {
+      // Start recording
+      Directory tempDir = await getTemporaryDirectory();
+      String tempPath = '${tempDir.path}/temp_audio.mp4';
+
+      await _recorder.startRecorder(toFile: tempPath, codec: Codec.aacMP4);
+      setState(() {
+        _isRecording = true;
+      });
+    }
+  }
+
   Future<void> _startRecording() async {
     Directory tempDir = await getTemporaryDirectory();
-    String tempPath = '${tempDir.path}/temp_audio.aac';
+    String tempPath = '${tempDir.path}/temp_audio.mp4';
 
-    await _recorder.startRecorder(toFile: tempPath, codec: Codec.aacADTS);
+    await _recorder.startRecorder(toFile: tempPath, codec: Codec.aacMP4);
     setState(() {
       _isRecording = true;
     });
@@ -59,60 +90,58 @@ class _TestPageState extends State<TestPage> {
       _isRecording = false;
       _recordedFilePath = filePath ?? '';
     });
-    /* DEBUGGING
-    final object2 = 'Chale';
-    print(object2);
-    final player2 = AudioPlayer();
-    await player2.play(DeviceFileSource(_recordedFilePath!));
-    print("Playing recorded audio for debugging: $_recordedFilePath");
-    */
     // Process the recorded audio (e.g., send to speech-to-text API)
     if (_recordedFilePath.isNotEmpty) {
-      /* final object = 'Hola';
-      print(object); */
-      await _sendAudioFile(File(_recordedFilePath));
-      await _sendToGemini(_message);
+      await _transcribeAudio(File(_recordedFilePath));
+      await sendMessageToOpenAI(_message);
       await _textToSpeech(_message);
     }
   }
 
-  Future<void> _sendAudioFile(File audioFile) async {
-    const String token = 'mariano sabe';
-    const String url = 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true';
+  Future<void> _transcribeAudio(File audioFile) async {
+  const String url = 'https://api.openai.com/v1/audio/transcriptions';
 
-    try {
-      // Read the file's bytes
-      Uint8List audioBytes = await audioFile.readAsBytes();
+  try {
+    // Prepare the multipart request
+    final request = http.MultipartRequest('POST', Uri.parse(url))
+      ..headers['Authorization'] = 'Bearer $apiKey'
+      ..headers['Content-Type'] = 'multipart/form-data'
+      ..fields['model'] = 'whisper-1'
+      ..files.add(await http.MultipartFile.fromPath(
+        'file',
+        audioFile.path,
+        contentType: MediaType('audio', 'flac'),
+      ));
 
-      // Send POST request with audio file
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Token $token',
-          'Content-Type': 'audio/aac',
-        },
-        body: audioBytes,
-      );
+      const language = 'es';
+      const prompt = '';
 
-      // Process the response
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        final transcription = jsonResponse['results']?['channels']?[0]?['alternatives']?[0]?['transcript'];
-
-        setState(() {
-          _message = transcription ?? 'No transcription found.';
-        });
-      } else {
-        setState(() {
-          _message = 'Failed: ${response.statusCode}';
-        });
+      if (language != null) {
+        request.fields['language'] = language; // Example: 'en' for English
       }
-    } catch (e) {
+      if (prompt != null) {
+        request.fields['prompt'] = prompt; // Example: Custom transcription guidance
+      }
+
+    // Send the request
+    final response = await http.Response.fromStream(await request.send());
+
+    // Process the response
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      final transcription = jsonResponse['text']; // Extract the transcription
       setState(() {
-        _message = 'Error: $e';
+          _message = transcription ?? 'No transcription found.';
       });
+
+      debugPrint('Transcription: $transcription');
+    } else {
+      debugPrint('Failed: ${response.statusCode}, ${response.body}');
     }
+  } catch (e) {
+    debugPrint('Error: $e');
   }
+}
 
   @override
   void dispose() {
@@ -120,91 +149,65 @@ class _TestPageState extends State<TestPage> {
     super.dispose();
   }
 
-  /* Funcion funcional con audio local mp3
-  // Function to send POST request
-  Future<void> _sendAudioFile() async {
-    const String token = '7b9f6c1f2fbb1a47e6cf3d4b7727c94b99efdb4f';
-    const String url = 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true';
+  Future<void> sendMessageToOpenAI(String userMessage) async {
+  const String url = 'https://api.openai.com/v1/chat/completions';
 
-    try {
-      // Load the audio file from assets
-      ByteData audioData = await rootBundle.load('assets/audioEN.mp3');
-      Uint8List audioBytes = audioData.buffer.asUint8List();
-
-      // Make the POST request
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Token $token',
-          'Content-Type': 'audio/mpeg', // Use 'audio/wav' if the file is in WAV format
+  try {
+    // Prepare the request body
+    final body = jsonEncode({
+      'model': 'gpt-4o-mini',
+      'messages': [
+        {
+          'role': 'system',
+          'content': 'You are a helpful assistant. You talk short and not long.', // System instruction
         },
-        body: audioBytes,
-      );
+        {
+          'role': 'user',
+          'content': userMessage, // Message from the user
+        },
+      ],
+      'max_completion_tokens': 60,
+    });
 
-      // Process the response
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        // Extract the transcription
-        final String? transcription = jsonResponse['results']?['channels']?[0]?['alternatives']?[0]?['transcript'];
+    // Send the POST request
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $apiKey',
+      },
+      body: body,
+    );
 
-        setState(() {
-          _message = transcription ?? 'No transcription found.';
-        });
-      } else {
-        setState(() {
-          responseMessage = 'Request failed with status: ${response.statusCode}';
-        });
-      }
-    } catch (e) {
+    // Process the response
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      final reply = jsonResponse['choices']?[0]?['message']?['content'];
+
       setState(() {
-        responseMessage = 'Error: $e';
+        _message = reply; // Assuming responseMessage is a state variable
       });
+
+      print('OpenAI Reply: $reply'); // Debug or handle the reply as needed
+    } else {
+      print('Failed: ${response.statusCode}, ${response.body}');
     }
-  } 
-  */
-
-  Future<void> _sendToGemini(String prompt) async {
-    try {
-      // Initialize the Gemini GenerativeModel
-      final model = GenerativeModel(
-        model: 'gemini-1.5-flash-8b',
-        apiKey: 'mariano sabe', // Replace with your actual API key
-        systemInstruction: Content.system(
-          'You are a cat. Your name is Neko. You should always end phrases with nya. You talk Spanish.',
-        ),
-        generationConfig: GenerationConfig(maxOutputTokens: 100),
-      );
-
-      // Start a chat session
-      final chat = model.startChat();
-      final content = Content.text(prompt);
-
-      // Send the message to the LLM
-      final response = await chat.sendMessage(content);
-
-      // Update the UI with the LLM's response
-      setState(() {
-        _message = response.text!; // Assuming responseMessage is a state variable
-      });
-    } catch (e) {
-      setState(() {
-        responseMessage = 'Error sending prompt to LLM: $e';
-      });
-    }
+  } catch (e) {
+    print('Error: $e');
   }
+}
 
   // Function to convert text to speech using OpenAI API
   Future<void> _textToSpeech(String inputText) async {
-    const String airbag = 'mariano sabe';
-    const String ttsModel = 'tts-1'; // Model for TTS
-    const String voice = 'alloy'; // Voice for the TTS
+    const String ttsModel = 'tts-1-hd'; // Model for TTS
+    const String voice = 'nova'; // Voice for the TTS
 
     try {
       final url = Uri.parse('https://api.openai.com/v1/audio/speech');
 
       // Request headers
       final headers = {
-        'Authorization': 'Bearer $airbag',
+        'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
       };
 
@@ -213,6 +216,7 @@ class _TestPageState extends State<TestPage> {
         'model': ttsModel,
         'input': inputText,
         'voice': voice,
+        'speed': 1.0,
       });
 
       // Make the POST request
@@ -231,7 +235,7 @@ class _TestPageState extends State<TestPage> {
         await player.play(DeviceFileSource(filePath));
 
         setState(() {
-          _message = 'Audio played successfully!';
+          //_message = 'Audio played successfully!';
         });
       } else {
         setState(() {
@@ -245,59 +249,11 @@ class _TestPageState extends State<TestPage> {
     }
   }
 
-
-  void _playAudio() async {
-    // Load and play an audio file from the assets or a network URL
-    await player.play(AssetSource('audioEN.mp3'));
-  }
-
-  // Function to update the message when Button A is clicked
-  void _buttonAClicked() {
-    setState(() {
-      _message = 'Audio playing';
-      _playAudio();
-    });
-  }
-
-  /* Testing
-  // Function to update the message when Button B is clicked
-  void _buttonBClicked() {
-    setState(() {
-      _message = 'Button B was clicked';
-      _sendAudioFile();
-    });
-  }
-  */
-
-  void _buttonCClicked() {
-    setState(() {
-      //_message = 'Button C was clicked';
-      _sendToGemini(_message);
-    });
-  }
-
-  void _buttonDClicked() {
-    setState(() {
-      //_message = 'Button D was clicked';
-      //_textToSpeech('Hola, te extrañe mucho');
-      _textToSpeech(_message);
-    });
-  }
-
-  void _megaMethod() {
-    setState(() {
-      _buttonAClicked();
-      //_buttonBClicked();
-      _buttonCClicked();
-      _buttonDClicked();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Test Page with Buttons'),
+        title: const Text('Test Page with Buttons'),
       ),
       body: Center(
         child: Column(
@@ -317,29 +273,14 @@ class _TestPageState extends State<TestPage> {
               onPressed: _isRecording ? _stopRecording : null,
               child: const Text('Stop Recording'),
             ),
+            IconButton(
+              icon: Icon(_isRecording ? Icons.stop : Icons.mic),
+              color: _isRecording ? Colors.red : Colors.blue,
+              onPressed: toggleRecording,
+            ),
             Text(
               '$_message', // Displaying the message based on the button clicked
-              style: TextStyle(fontSize: 20),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _buttonAClicked, // When Button A is clicked
-              child: Text('Play Audio'),
-            ),
-            SizedBox(height: 10),
-            /*ElevatedButton(
-              onPressed: _buttonBClicked, // When Button B is clicked
-              child: Text('Speech to text'),
-            ), */
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _buttonCClicked, // When Button B is clicked
-              child: Text('LLM response'),
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _buttonDClicked, // When Button B is clicked
-              child: Text('Text to speech'),
+              style: const TextStyle(fontSize: 20),
             ),
           ],
         ),
