@@ -108,7 +108,7 @@ class _MessagesPageState extends State<MessagesPage> {
 Estás hablando con ${_userName ?? 'un usuario'}, quien se describe como: ${_userDescription ?? 'una persona amigable'}.
 Tu estilo de conversación es ${_conversationStyle ?? 'casual'}.
 Debes mantener consistencia con tu personalidad y adaptar tus respuestas al estilo conversacional indicado.
-Mantén presente el contexto de la conversación y la descripción del usuario para personalizar tus respuestas.''';
+Mantén presente el contexto de la conversación y la descripción del usuario para personalizar tus respuestas.Evita sonar tan formal y habla mas como un amigo cercano.''';
   }
 
   Future<void> _sendMessage() async {
@@ -117,9 +117,18 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
       _controller.clear();
 
       final now = DateTime.now();
+
+      // Agregar mensaje del usuario
+      setState(() {
+        _messages.add({'text': messageText, 'isUser': true, 'time': now});
+      });
+      _scrollToBottom();
+
+      // Guardar mensaje
       await _saveMessage(messageText, true, now);
 
       try {
+        // Continuar con la lógica del bot
         if (conversationHistory.length >= maxHistoryLength) {
           conversationHistory.removeRange(0, 2);
         }
@@ -161,8 +170,6 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
           );
         }
       }
-
-      _scrollToBottom();
     }
   }
 
@@ -187,21 +194,6 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
           })
           .select()
           .single();
-
-      // Actualizar el estado local
-      setState(() {
-        _messages.add({
-          'text': message,
-          'isUser': isUserMessage,
-          'time': time ?? DateTime.now(),
-        });
-        // Ordenar la lista
-        _messages.sort((a, b) {
-          final timeA = a['time'] as DateTime;
-          final timeB = b['time'] as DateTime;
-          return timeA.compareTo(timeB);
-        });
-      });
     } catch (error) {
       print('Error saving message: $error');
       if (mounted) {
