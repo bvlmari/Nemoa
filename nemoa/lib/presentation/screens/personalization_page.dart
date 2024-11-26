@@ -17,7 +17,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   int _currentIndex = 0;
   Color _selectedColor = Colors.blue;
   int _selectedSection = 0;
-  String _selectedVoice = 'Voz 1';
+  String _selectedVoice = 'alloy';
   List<String> _selectedAccessories = [];
   String? _selectedIconUrl;
   //String? _selectedAccessories;
@@ -103,13 +103,19 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   final List<String> _voiceOptions = ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'];
 
   final Map<String, String> _voiceAudioSamples = {
-  'Alloy': 'AlloyTest.mp3',
-  'Echo': 'EchoTest.mp3',
-  'Fable': 'FableTest.mp3',
-  'Onyx': 'OnyxTest.mp3',
-  'Nova': 'NovaTest.mp3',
-  'Shimmer': 'ShimmerTest.mp3',
-};
+    'Alloy':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/AlloyTest.mp3?t=2024-11-25T10%3A06%3A51.915Z',
+    'Echo':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/EchoTest.mp3?t=2024-11-25T10%3A07%3A05.681Z',
+    'Fable':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/FableTest.mp3',
+    'Onyx':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/OnyxTest.mp3?t=2024-11-25T10%3A08%3A17.746Z',
+    'Nova':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/NovaTest.mp3?t=2024-11-25T10%3A07%3A34.950Z',
+    'Shimmer':
+        'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/Voices/ShimmerTest.mp3?t=2024-11-25T10%3A08%3A43.103Z',
+  };
 
   @override
   void initState() {
@@ -271,7 +277,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
   void _playAudio(String audioName) async {
   // Load and play an audio file from the assets
-  await player.play(AssetSource(audioName));
+  await player.play(UrlSource(audioName));
 }
   
   Future<void> _loadCurrentFriendData() async {
@@ -509,7 +515,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             final isSelected = _selectedVoice == voiceId.toString();
 
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: ListTile(
                 onTap: () {
                   setState(() {
