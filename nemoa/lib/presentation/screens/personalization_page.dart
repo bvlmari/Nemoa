@@ -100,7 +100,14 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     },
   ];
 
-  final List<String> _voiceOptions = ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'];
+  final List<String> _voiceOptions = [
+    'Alloy',
+    'Echo',
+    'Fable',
+    'Onyx',
+    'Nova',
+    'Shimmer'
+  ];
 
   final Map<String, String> _voiceAudioSamples = {
     'Alloy':
@@ -247,7 +254,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
         if (friendData != null && friendData['idVoz'] != null) {
           setState(() {
-            _selectedVoice = friendData['idVoz'].toString(); // Set the selected voice
+            _selectedVoice =
+                friendData['idVoz'].toString(); // Set the selected voice
           });
         }
       } catch (error) {
@@ -276,10 +284,10 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   }
 
   void _playAudio(String audioName) async {
-  // Load and play an audio file from the assets
-  await player.play(UrlSource(audioName));
-}
-  
+    // Load and play an audio file from the assets
+    await player.play(UrlSource(audioName));
+  }
+
   Future<void> _loadCurrentFriendData() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -323,7 +331,9 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
             // Update selected voice
             final voiceId = friendData['voiceId'] as int?;
-            if (voiceId != null && voiceId > 0 && voiceId <= _voiceOptions.length) {
+            if (voiceId != null &&
+                voiceId > 0 &&
+                voiceId <= _voiceOptions.length) {
               _selectedVoice = _voiceOptions[voiceId - 1];
             } else {
               _selectedVoice = 'alloy'; // Default voice
@@ -519,7 +529,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
               child: ListTile(
                 onTap: () {
                   setState(() {
-                    _selectedVoice = voiceId.toString(); // Store the ID as a string
+                    _selectedVoice =
+                        voiceId.toString(); // Store the ID as a string
                   });
                 },
                 shape: RoundedRectangleBorder(
