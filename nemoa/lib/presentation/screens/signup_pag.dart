@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/login_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bcrypt/bcrypt.dart';
 import 'dart:math' as math;
 
 class SignUpPage extends StatefulWidget {
@@ -41,6 +42,17 @@ class _SignUpPageState extends State<SignUpPage>
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
     );
     return emailRegExp.hasMatch(email);
+  }
+
+  // Función para hashear la contraseña antes de guardarla
+  String hashPassword(String password) {
+    final salt = BCrypt.gensalt();
+    return BCrypt.hashpw(password, salt);
+  }
+
+  // Función para verificar la contraseña
+  bool verifyPassword(String inputPassword, String hashedPassword) {
+    return BCrypt.checkpw(inputPassword, hashedPassword);
   }
 
 // Función para validar la contraseña
@@ -154,10 +166,13 @@ class _SignUpPageState extends State<SignUpPage>
         // 4. Obtener el ID del usuario recién creado
         final idUsuario = usuarioResult['idUsuario'];
 
+        // Hashear la contraseña antes de guardarla
+        final hashedPassword = hashPassword(password);
+
         // 5. Crear el registro en datosInicio
         await Supabase.instance.client.from('datosInicio').insert({
           'email': email,
-          'password': password,
+          'password': hashedPassword, // Guardar hash en lugar de texto plano
           'idUsuario': idUsuario,
         });
 
