@@ -1,6 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/custom_header.dart';
 import 'package:nemoa/presentation/screens/bottom_nav_bar.dart';
+import 'package:nemoa/presentation/screens/login_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -25,6 +28,47 @@ class _UserProfilePageState extends State<UserProfilePage> {
     _aboutController.dispose();
     _responseStyleController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // Paso 1: Obtener datos del usuario desde la base de datos
+        final userRecord = await Supabase.instance.client
+            .from('usuarios')
+            .select('nombre, descripcion, idEstilo')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        if (userRecord != null) {
+          // Paso 2: Obtener el nombre del estilo conversacional
+          final estiloResponse = await Supabase.instance.client
+              .from('EstilosConversacionales')
+              .select('nombreEstilo')
+              .eq('idEstilo', userRecord['idEstilo'])
+              .single();
+
+          setState(() {
+            _nameController.text = userRecord['nombre'] ?? '';
+            _aboutController.text = userRecord['descripcion'] ?? '';
+            _responseStyleController.text =
+                estiloResponse?['nombreEstilo'] ?? '';
+          });
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar datos: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -82,6 +126,32 @@ class _UserProfilePageState extends State<UserProfilePage> {
           );
         }
       }
+    }
+  }
+
+  Future<void> _logout() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // Cambiar el estadoSesion a 0 (cerrado) en la base de datos
+        await Supabase.instance.client.from('usuarios').update({
+          'estadoSesion': 0, // 0 representa sesión cerrada
+        }).eq('auth_user_id', user.id);
+
+        // Cerrar sesión en Supabase
+        await Supabase.instance.client.auth.signOut();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session closed successfully')),
+        );
+
+        // Navegar de regreso a la pantalla de inicio de sesión
+        Navigator.pushReplacementNamed(context, LoginPage.routename);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error closing session: ${e.toString()}')),
+      );
     }
   }
 
@@ -227,6 +297,28 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 fontFamily: 'Roboto',
                                 fontSize: 14,
                               ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: _logout,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 40, vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Logout',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
                             ),
                           ),
                         ),
