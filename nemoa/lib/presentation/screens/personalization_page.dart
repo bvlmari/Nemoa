@@ -115,6 +115,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   void initState() {
     super.initState();
     _loadCurrentFriendData();
+    _loadSelectedVoice();
   }
 
   @override
@@ -182,6 +183,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           await supabase.from('amigosVirtuales').update({
             'idApariencia': appearanceResponse['idApariencia'],
             'nombre': _nameController.text,
+            'idVoz': int.parse(_selectedVoice),
           }).eq('idAmigo', existingFriend['idAmigo']);
         } else {
           // 4b. Crear un nuevo amigo virtual
@@ -189,11 +191,13 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             'nombre': _nameController.text,
             'idUsuario': userData['idUsuario'],
             'idApariencia': appearanceResponse['idApariencia'],
+            'idVoz': int.parse(_selectedVoice), // Save the selected voice ID
           });
         }
 
         // 5. Recargar los datos después de guardar
         await _loadCurrentFriendData();
+        await _loadSelectedVoice();
       }
 
       if (context.mounted) {
@@ -212,6 +216,36 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _loadSelectedVoice() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // Fetch the user's virtual friend data
+        final userData = await supabase
+            .from('usuarios')
+            .select('idUsuario')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        final friendData = await supabase
+            .from('amigosVirtuales')
+            .select('idVoz')
+            .eq('idUsuario', userData['idUsuario'])
+            .maybeSingle();
+
+        if (friendData != null && friendData['idVoz'] != null) {
+          setState(() {
+            _selectedVoice = friendData['idVoz'].toString(); // Set the selected voice
+          });
+        }
+      } catch (error) {
+        print('Error loading selected voice: $error');
       }
     }
   }
@@ -279,6 +313,14 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
               } else {
                 _selectedAccessories = [];
               }
+            }
+
+            // Update selected voice
+            final voiceId = friendData['voiceId'] as int?;
+            if (voiceId != null && voiceId > 0 && voiceId <= _voiceOptions.length) {
+              _selectedVoice = _voiceOptions[voiceId - 1];
+            } else {
+              _selectedVoice = 'alloy'; // Default voice
             }
           });
         }
@@ -461,14 +503,17 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
       case 2: // Voz
         return Column(
-          children: _voiceOptions.map((voice) {
-            final isSelected = _selectedVoice == voice;
+          children: List.generate(_voiceOptions.length, (index) {
+            final voiceName = _voiceOptions[index];
+            final voiceId = index + 1; // IDs go from 1 to 5
+            final isSelected = _selectedVoice == voiceId.toString();
+
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: ListTile(
                 onTap: () {
                   setState(() {
-                    _selectedVoice = voice;
+                    _selectedVoice = voiceId.toString(); // Store the ID as a string
                   });
                 },
                 shape: RoundedRectangleBorder(
@@ -482,7 +527,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                   color: Colors.white,
                 ),
                 title: Text(
-                  voice,
+                  voiceName, // Display the voice name
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -494,8 +539,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                     color: Colors.white.withOpacity(0.7),
                   ),
                   onPressed: () async {
-                    // Get the corresponding audio file name for the voice
-                    final audioFileName = _voiceAudioSamples[voice];
+                    // Play the audio sample for the voice
+                    final audioFileName = _voiceAudioSamples[voiceName];
                     if (audioFileName != null) {
                       _playAudio(audioFileName);
                     }
@@ -503,7 +548,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                 ),
               ),
             );
-          }).toList(),
+          }),
         );
 
       default:
