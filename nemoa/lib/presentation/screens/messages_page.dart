@@ -285,7 +285,7 @@ Future<void> _sendMessage() async {
   @override
   void initState() {
     super.initState();
-    _loadCurrentFriendData().then((_) {
+    _loadUserDataAndFriend().then((_) {
       _loadMessages();
     });
     _scrollToBottom();
