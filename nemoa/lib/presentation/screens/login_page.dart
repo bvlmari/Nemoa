@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nemoa/presentation/screens/forgot_password_page.dart';
 import 'package:nemoa/presentation/screens/main_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nemoa/presentation/screens/user_profile_page.dart';
 import 'dart:math' as math;
 
 class LoginPage extends StatefulWidget {
@@ -68,20 +69,45 @@ class _LoginPageState extends State<LoginPage>
         throw 'User not found in database';
       }
 
+      // 2.1 Fetch user profile data from 'usuarios' table
+      final userProfile = await Supabase.instance.client
+          .from('usuarios')
+          .select('descripcion, idEstilo')
+          .eq('idUsuario', userData['idUsuario'])
+          .single();
+
+      if (userProfile == null) {
+        throw 'User profile not found';
+      }
+
       // 3. Actualizar el estado de sesión en la tabla usuarios
       await Supabase.instance.client
           .from('usuarios')
           .update({'estadoSesion': 1}).eq('idUsuario', userData['idUsuario']);
 
-      if (mounted) {
-        // 4. Mostrar mensaje de éxito y navegar a la página principal
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
-            backgroundColor: Colors.lightBlue,
-          ),
-        );
-        Navigator.pushReplacementNamed(context, MainPage.routename);
+      // 5. Check if 'descripcion' or 'idEstilo' are missing or null
+      if (userProfile['descripcion'] == null || userProfile['idEstilo'] == null) {
+        // If either field is missing, navigate to ProfilePage
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Incomplete user data. Please update your profile.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          Navigator.pushReplacementNamed(context, UserProfilePage.routename);
+        }
+      } else {
+        // If both fields are present, navigate to MainPage
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login successful!'),
+              backgroundColor: Colors.lightBlue,
+            ),
+          );
+          Navigator.pushReplacementNamed(context, MainPage.routename);
+        }
       }
     } catch (e) {
       if (mounted) {
