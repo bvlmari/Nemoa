@@ -10,6 +10,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:http_parser/http_parser.dart';
 
@@ -34,10 +35,27 @@ class TestPageState extends State<TestPage> {
 
   String responseMessage = '';
 
+    String? _friendName;
+  String? _friendAvatarUrl;
+    String? _userName;
+  bool _isLoading = true;
+  int? _userId;
+    String? _userDescription;
+  String? _conversationStyle;
+
+ List<Map<String, String>> conversationHistory = [];
+
   @override
   void initState() {
     super.initState();
     _initRecorder();
+    _loadUserDataAndFriend();
+    conversationHistory = [
+    {
+      'role': 'system',
+      'content': _buildSystemPrompt(),
+    },
+  ];
   }
 
   void updateVoiceSettings(String voiceName, int velocity) {
@@ -69,7 +87,7 @@ class TestPageState extends State<TestPage> {
       // Process the recorded audio
       if (_recordedFilePath.isNotEmpty) {
         await _transcribeAudio(File(_recordedFilePath));
-        await sendMessageToOpenAI(_message);
+        await sendMessageToOpenAI(conversationHistory);
         await _textToSpeech(_message);
       }
     } else {
@@ -103,10 +121,67 @@ class TestPageState extends State<TestPage> {
     // Process the recorded audio (e.g., send to speech-to-text API)
     if (_recordedFilePath.isNotEmpty) {
       await _transcribeAudio(File(_recordedFilePath));
-      await sendMessageToOpenAI(_message);
+      //await sendMessageToOpenAI(_message);
       await _textToSpeech(_message);
     }
   }
+
+  Future<void> _loadUserDataAndFriend() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // Obtener datos del usuario incluyendo el estilo conversacional
+        final userData = await supabase.from('usuarios').select('''
+              idUsuario,
+              nombre,
+              descripcion,
+              EstilosConversacionales!inner (
+                nombreEstilo
+              )
+            ''').eq('auth_user_id', user.id).single();
+
+        _userId = userData['idUsuario'];
+        _userName = userData['nombre'];
+        _userDescription = userData['descripcion'];
+        _conversationStyle =
+            userData['EstilosConversacionales']['nombreEstilo'];
+
+        // Obtener datos del amigo virtual
+        final friendData = await supabase.from('amigosVirtuales').select('''
+              nombre,
+              Apariencias (
+                Icono
+              )
+            ''').eq('idUsuario', _userId!).single();
+
+        setState(() {
+          _friendName = friendData['nombre'];
+          _friendAvatarUrl = friendData['Apariencias']['Icono'];
+          _isLoading = false;
+        });
+      } catch (error) {
+        print('Error loading data: $error');
+        setState(() {
+          _isLoading = false;
+          // Valores por defecto
+          _userName = 'Usuario';
+          _conversationStyle = 'casual';
+          _userDescription = 'Un usuario amigable';
+          _friendName = 'Amigo Virtual';
+        });
+      }
+    }
+  }
+
+String _buildSystemPrompt() {
+    return '''Eres un amigo virtual llamado ${_friendName ?? 'Amigo'}. 
+    Estás hablando con ${_userName ?? 'un usuario'}, quien se describe como: ${_userDescription ?? 'una persona amigable'}.
+    Tu estilo de conversación es ${_conversationStyle ?? 'casual'}.
+    Debes mantener consistencia con tu personalidad y adaptar tus respuestas al estilo conversacional indicado.
+    Mantén presente el contexto de la conversación y la descripción del usuario para personalizar tus respuestas.Evita sonar tan formal y habla mas como un amigo cercano.''';
+      }
 
   Future<void> _transcribeAudio(File audioFile) async {
   const String url = 'https://api.openai.com/v1/audio/transcriptions';
@@ -144,6 +219,12 @@ class TestPageState extends State<TestPage> {
           _message = transcription ?? 'No transcription found.';
       });
 
+      // Add transcription to conversation history
+      conversationHistory.add({
+        'role': 'user',
+        'content': transcription,
+      });
+
       debugPrint('Transcription: $transcription');
     } else {
       debugPrint('Failed: ${response.statusCode}, ${response.body}');
@@ -159,23 +240,14 @@ class TestPageState extends State<TestPage> {
     super.dispose();
   }
 
-  Future<void> sendMessageToOpenAI(String userMessage) async {
+  Future<void> sendMessageToOpenAI(List<Map<String, String>> history) async {
   const String url = 'https://api.openai.com/v1/chat/completions';
 
   try {
     // Prepare the request body
     final body = jsonEncode({
       'model': 'gpt-4o-mini',
-      'messages': [
-        {
-          'role': 'system',
-          'content': 'You are a helpful assistant. You talk short and not long.', // System instruction
-        },
-        {
-          'role': 'user',
-          'content': userMessage, // Message from the user
-        },
-      ],
+      'messages': history,
       'max_completion_tokens': 60,
     });
 
@@ -194,9 +266,17 @@ class TestPageState extends State<TestPage> {
       final jsonResponse = jsonDecode(response.body);
       final reply = jsonResponse['choices']?[0]?['message']?['content'];
 
-      setState(() {
-        _message = reply; // Assuming responseMessage is a state variable
-      });
+      // Add reply to conversation history
+      if (reply != null) {
+        conversationHistory.add({
+          'role': 'assistant',
+          'content': reply,
+        });
+
+        setState(() {
+          _message = reply; // Update UI with reply
+        });
+      }
 
       print('OpenAI Reply: $reply'); // Debug or handle the reply as needed
     } else {
