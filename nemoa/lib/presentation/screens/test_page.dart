@@ -185,6 +185,7 @@ String _buildSystemPrompt() {
 
   Future<void> _transcribeAudio(File audioFile) async {
   const String url = 'https://api.openai.com/v1/audio/transcriptions';
+  final now = DateTime.now();
 
   try {
     // Prepare the multipart request
@@ -218,6 +219,8 @@ String _buildSystemPrompt() {
       setState(() {
           _message = transcription ?? 'No transcription found.';
       });
+
+      await _saveMessage(transcription ?? 'No transcription', true, now, 1);
 
       // Add transcription to conversation history
       conversationHistory.add({
@@ -276,6 +279,9 @@ String _buildSystemPrompt() {
         setState(() {
           _message = reply; // Update UI with reply
         });
+
+        final botTime = DateTime.now();
+        await _saveMessage(reply, false, botTime, 2);
       }
 
       print('OpenAI Reply: $reply'); // Debug or handle the reply as needed
@@ -336,6 +342,71 @@ String _buildSystemPrompt() {
       setState(() {
         _message = 'Error: $e';
       });
+    }
+  }
+
+  Future<void> _saveMessage(
+  String message, 
+  bool isUserMessage, 
+  DateTime time, 
+  int messageType, // New parameter for message type
+) async {
+  try {
+    final supabase = Supabase.instance.client;
+
+    // Retrieve or create the message type
+    //final tipoMensajeId = await _getOrCreateTipoMensaje(messageType);
+
+    // Insert the message into the database
+    await supabase
+        .from('mensajes')
+        .insert({
+          'contenidoMmensaje': message,
+          'emisor': isUserMessage ? _userId.toString() : 'bot',
+          'receptor': isUserMessage ? 'bot' : _userId.toString(),
+          'fechaEnvio': time.toIso8601String(),
+          'idTipo': messageType,
+        })
+        .select()
+        .single();
+  } catch (error) {
+    print('Error saving $messageType: $error');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving $messageType: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+
+  Future<int> _getOrCreateTipoMensaje(String tipo) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      // Intentar encontrar el tipo existente
+      final existingTipo = await supabase
+          .from('TiposMensajes')
+          .select()
+          .eq('tipoMensaje', tipo)
+          .maybeSingle();
+
+      if (existingTipo != null) {
+        return existingTipo['idTipo'];
+      }
+
+      // Si no existe, crear uno nuevo
+      final newTipo = await supabase
+          .from('TiposMensajes')
+          .insert({'tipoMensaje': tipo})
+          .select()
+          .single();
+      return newTipo['idTipo'];
+    } catch (error) {
+      print('Error managing message type: $error');
+      throw error;
     }
   }
 
