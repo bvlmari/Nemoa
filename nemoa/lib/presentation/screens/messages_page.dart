@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:nemoa/presentation/screens/main_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class MessagesPage extends StatefulWidget {
   static const String routename = 'MessagesPage';
@@ -12,6 +14,7 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
+  final String apiKey = 'mariano sabe';
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -20,7 +23,7 @@ class _MessagesPageState extends State<MessagesPage> {
   bool _isLoading = true;
   int? _userId;
 
-  List<String> conversationHistory = [];
+List<Map<String, String>> conversationHistory = [];
 
   Future<int> _getOrCreateTipoMensaje(String tipo) async {
     final supabase = Supabase.instance.client;
@@ -50,117 +53,137 @@ class _MessagesPageState extends State<MessagesPage> {
     }
   }
 
-  Future<void> _sendMessage() async {
-    if (_controller.text.isNotEmpty) {
-      final messageText = _controller.text;
-      _controller.clear();
+Future<void> _sendMessage() async {
+  if (_controller.text.isNotEmpty) {
+    final messageText = _controller.text;
+    _controller.clear();
 
-      // Guardar mensaje del usuario con hora
-      final now = DateTime.now();
-      await _saveMessage(messageText, true, now);
+    // Add user message to conversation history
+    conversationHistory.add({
+      'role': 'user',
+      'content': messageText,
+    });
 
-      try {
-        // Actualizar el historial de conversación
-        conversationHistory.add("User: $messageText");
+    // Save user message to the UI with timestamp
+    final now = DateTime.now();
+    await _saveMessage(messageText, true, now);
 
-        // Construir el prompt y obtener respuesta de la API
-        final prompt = conversationHistory.join("\n");
-        final model = GenerativeModel(
-          model: 'gemini-1.5-flash-8b',
-          apiKey: 'AIzaSyDa77VcOBcUythCYrcWYkSZyRo9JIZP7HQ',
-          systemInstruction: Content.system(
-              'You are a cat. Your name is Neko. You should always end phrases with nya. You talk Spanish.'),
-          generationConfig: GenerationConfig(maxOutputTokens: 100),
-        );
-
-        final chat = model.startChat();
-        final content = Content.text(prompt);
-        final response = await chat.sendMessage(content);
-
-        // Validar y guardar la respuesta
-        if (response.text != null) {
-          final botTime = DateTime.now();
-          await _saveMessage(response.text!, false, botTime);
-
-          // Actualizar el historial de conversación
-          conversationHistory.add("Bot: ${response.text!}");
-
-          setState(() {
-            _messages.add(
-                {'text': response.text!, 'isUser': false, 'time': botTime});
-          });
-        } else {
-          throw Exception("Respuesta vacía del modelo");
-        }
-      } catch (error) {
-        print('Error al enviar mensaje: $error');
-
-        // Mostrar mensaje de error al usuario
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.toString().contains("Quota exceeded")
-                  ? "Se excedió el límite de solicitudes. Inténtalo más tarde."
-                  : "No se pudo procesar tu mensaje. Intenta de nuevo.",
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-
-      // Desplazar la vista al final
-      _scrollToBottom();
-    }
-  }
-
-  Future<void> _saveMessage(
-      String message, bool isUserMessage, DateTime time) async {
     try {
-      final supabase = Supabase.instance.client;
+      // Prepare the messages array for the request
+      final messages = [
+        {
+          'role': 'system',
+          'content': 'You are a helpful assistant. You talk short and not long.',
+        },
+        ...conversationHistory, // Include conversation history
+      ];
 
-      // Obtener o crear el tipo de mensaje
-      final tipoMensajeId =
-          await _getOrCreateTipoMensaje(isUserMessage ? 'user' : 'bot');
-
-      // Guardar el mensaje en la tabla mensajes
-      await supabase
-          .from('mensajes')
-          .insert({
-            'contenidoMmensaje': message,
-            'emisor': isUserMessage ? _userId.toString() : 'bot',
-            'receptor': isUserMessage ? 'bot' : _userId.toString(),
-            'fechaEnvio': time.toIso8601String(),
-            'idTipo': tipoMensajeId,
-          })
-          .select()
-          .single();
-
-      // Actualizar el estado local
-      setState(() {
-        _messages.add({
-          'text': message,
-          'isUser': isUserMessage,
-          'time': time ?? DateTime.now(),
-        });
-        // Ordenar la lista
-        _messages.sort((a, b) {
-          final timeA = a['time'] as DateTime;
-          final timeB = b['time'] as DateTime;
-          return timeA.compareTo(timeB);
-        });
+      final body = jsonEncode({
+        'model': 'gpt-4o-mini',
+        'messages': messages,
+        'max_tokens': 60, // Optional: Adjust token count based on your needs
       });
-    } catch (error) {
-      print('Error saving message: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving message: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+      // Send the POST request to the API
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: body,
+      );
+
+      // Handle the response
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final reply = jsonResponse['choices']?[0]?['message']?['content'];
+
+        if (reply != null) {
+          // Add assistant's reply to conversation history
+          conversationHistory.add({
+            'role': 'assistant',
+            'content': reply,
+          });
+
+          // Save bot response to UI with timestamp
+          final botTime = DateTime.now();
+          await _saveMessage(reply, false, botTime);
+
+          /*setState(() {
+            _messages.add(
+              {'text': reply, 'isUser': false, 'time': botTime},
+            );
+          });*/
+        } else {
+          throw Exception("Empty response from model.");
+        }
+      } else {
+        throw Exception("API error: ${response.statusCode}, ${response.body}");
       }
+    } catch (error) {
+      print('Error sending message: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Could not process your message. Try again."),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+
+    // Scroll to the bottom of the chat
+    _scrollToBottom();
+  }
+}
+
+Future<void> _saveMessage(
+    String message, bool isUserMessage, DateTime time) async {
+  try {
+    final supabase = Supabase.instance.client;
+
+    // Obtener o crear el tipo de mensaje
+    final tipoMensajeId =
+        await _getOrCreateTipoMensaje(isUserMessage ? 'user' : 'bot');
+
+    // Guardar el mensaje en la tabla mensajes
+    await supabase
+        .from('mensajes')
+        .insert({
+          'contenidoMmensaje': message,
+          'emisor': isUserMessage ? _userId.toString() : 'bot',
+          'receptor': isUserMessage ? 'bot' : _userId.toString(),
+          'fechaEnvio': time.toIso8601String(),
+          'idTipo': tipoMensajeId,
+        })
+        .select()
+        .single();
+
+    // Actualizar el estado local (moved message addition here)
+    setState(() {
+      _messages.add({
+        'text': message,
+        'isUser': isUserMessage,
+        'time': time,
+      });
+      // Ordenar la lista
+      _messages.sort((a, b) {
+        final timeA = a['time'] as DateTime;
+        final timeB = b['time'] as DateTime;
+        return timeA.compareTo(timeB);
+      });
+    });
+  } catch (error) {
+    print('Error saving message: $error');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving message: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
 
   Future<void> _loadMessages() async {
     try {
