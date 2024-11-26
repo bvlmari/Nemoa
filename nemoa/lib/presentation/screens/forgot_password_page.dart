@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nemoa/presentation/screens/reset_password_page.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   static const String routename = 'ForgotPasswordPage';
@@ -35,22 +36,23 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         throw 'No existe una cuenta con este correo electrónico';
       }
 
+      /*
       // Enviar correo de recuperación
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
         redirectTo: 'io.supabase.nemoa://reset-callback/',
-      );
+      ); */
 
       if (mounted) {
         _showMessage(
-          'Se ha enviado un enlace de recuperación a tu correo electrónico',
+          'Correo electrónico verificado. Redirigiendo a la página de restablecimiento de contraseña...',
           isError: false,
         );
 
         // Esperar unos segundos y volver a la pantalla de login
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
-            Navigator.pop(context);
+            Navigator.pushReplacementNamed(context, ResetPasswordPage.routename);
           }
         });
       }
@@ -105,7 +107,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Recuperar Contraseña',
+                'Olvidaste tu contraseña?',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -114,7 +116,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Ingresa tu correo electrónico y te enviaremos las instrucciones para recuperar tu contraseña',
+                'Ingresa tu correo electrónico y te redigiremos a un apartado para cambiar tu contraseña',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
@@ -173,7 +175,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           ),
                         )
                       : const Text(
-                          'Enviar instrucciones',
+                          'Verificar email',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,

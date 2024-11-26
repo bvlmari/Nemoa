@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nemoa/presentation/screens/login_page.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   static const String routename = 'ResetPasswordPage';
@@ -72,10 +73,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       final email = session.user.email;
       if (email == null) throw 'No se encontró el correo del usuario';
 
+      // Hashear la contraseña antes de guardarla
+      final hashedPassword = hashPassword(password);
+
       // Actualizar la contraseña en la tabla datosInicio
       await Supabase.instance.client
           .from('datosInicio')
-          .update({'password': password}).eq('email', email);
+          .update({'password': hashedPassword}).eq('email', email);
 
       if (mounted) {
         _showMessage(
@@ -117,6 +121,12 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  // Función para hashear la contraseña antes de guardarla
+  String hashPassword(String password) {
+    final salt = BCrypt.gensalt();
+    return BCrypt.hashpw(password, salt);
   }
 
   @override
