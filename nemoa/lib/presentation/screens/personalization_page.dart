@@ -100,14 +100,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     },
   ];
 
-  final List<String> _voiceOptions = [
-    'Alloy',
-    'Echo',
-    'Fable',
-    'Onyx',
-    'Nova',
-    'Shimmer'
-  ];
+  final List<String> _voiceOptions = ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'];
 
   final Map<String, String> _voiceAudioSamples = {
     'Alloy':
@@ -164,73 +157,68 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     final user = supabase.auth.currentUser;
 
     try {
+      // 1. Guardar la apariencia
+      final appearanceResponse = await supabase
+          .from('Apariencias')
+          .insert({
+            'Icono': _selectedIconUrl,
+            'accesorios': _selectedAccessories.isNotEmpty
+                ? _selectedAccessories.first
+                : null,
+          })
+          .select()
+          .single();
+
       if (user != null) {
-        // 1. Obtener el idUsuario
+        // 2. Obtener el idUsuario
         final userData = await supabase
             .from('usuarios')
             .select('idUsuario')
             .eq('auth_user_id', user.id)
             .single();
 
-        // 2. Verificar si el usuario ya tiene un amigo virtual
+        // 3. Verificar si el usuario ya tiene un amigo virtual
         final existingFriend = await supabase
             .from('amigosVirtuales')
-            .select('idAmigo, idApariencia')
+            .select()
             .eq('idUsuario', userData['idUsuario'])
-            .single();
+            .maybeSingle();
 
-        // 3. Actualizar la apariencia existente
-        if (existingFriend['idApariencia'] != null) {
-          await supabase.from('Apariencias').update({
-            'Icono': _selectedIconUrl,
-            'accesorios': _selectedAccessories.isNotEmpty
-                ? _selectedAccessories.first
-                : null,
-          }).eq('idApariencia', existingFriend['idApariencia']);
+        if (existingFriend != null) {
+          // 4a. Actualizar el amigo virtual existente
+          await supabase.from('amigosVirtuales').update({
+            'idApariencia': appearanceResponse['idApariencia'],
+            'nombre': _nameController.text,
+            'idVoz': int.parse(_selectedVoice),
+          }).eq('idAmigo', existingFriend['idAmigo']);
         } else {
-          // Si no hay apariencia, crear una nueva
-          final appearanceResponse = await supabase
-              .from('Apariencias')
-              .insert({
-                'Icono': _selectedIconUrl,
-                'accesorios': _selectedAccessories.isNotEmpty
-                    ? _selectedAccessories.first
-                    : null,
-              })
-              .select()
-              .single();
-
-          // Actualizar el idApariencia del amigo virtual
-          await supabase
-              .from('amigosVirtuales')
-              .update({'idApariencia': appearanceResponse['idApariencia']}).eq(
-                  'idAmigo', existingFriend['idAmigo']);
+          // 4b. Crear un nuevo amigo virtual
+          await supabase.from('amigosVirtuales').insert({
+            'nombre': _nameController.text,
+            'idUsuario': userData['idUsuario'],
+            'idApariencia': appearanceResponse['idApariencia'],
+            'idVoz': int.parse(_selectedVoice), // Save the selected voice ID
+          });
         }
-
-        // 4. Actualizar los datos del amigo virtual
-        await supabase.from('amigosVirtuales').update({
-          'nombre': _nameController.text,
-          'idVoz': int.parse(_selectedVoice),
-        }).eq('idAmigo', existingFriend['idAmigo']);
 
         // 5. Recargar los datos después de guardar
         await _loadCurrentFriendData();
         await _loadSelectedVoice();
+      }
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Appearance updated successfully!'),
-              backgroundColor: Colors.lightBlue,
-            ),
-          );
-        }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Appearance saved successfully!'),
+            backgroundColor: Colors.lightBlue,
+          ),
+        );
       }
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating appearance: $error'),
+            content: Text('Error saving appearance: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -259,8 +247,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
         if (friendData != null && friendData['idVoz'] != null) {
           setState(() {
-            _selectedVoice =
-                friendData['idVoz'].toString(); // Set the selected voice
+            _selectedVoice = friendData['idVoz'].toString(); // Set the selected voice
           });
         }
       } catch (error) {
@@ -289,10 +276,10 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   }
 
   void _playAudio(String audioName) async {
-    // Load and play an audio file from the assets
-    await player.play(UrlSource(audioName));
-  }
-
+  // Load and play an audio file from the assets
+  await player.play(UrlSource(audioName));
+}
+  
   Future<void> _loadCurrentFriendData() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -336,9 +323,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
 
             // Update selected voice
             final voiceId = friendData['voiceId'] as int?;
-            if (voiceId != null &&
-                voiceId > 0 &&
-                voiceId <= _voiceOptions.length) {
+            if (voiceId != null && voiceId > 0 && voiceId <= _voiceOptions.length) {
               _selectedVoice = _voiceOptions[voiceId - 1];
             } else {
               _selectedVoice = 'alloy'; // Default voice
@@ -534,8 +519,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
               child: ListTile(
                 onTap: () {
                   setState(() {
-                    _selectedVoice =
-                        voiceId.toString(); // Store the ID as a string
+                    _selectedVoice = voiceId.toString(); // Store the ID as a string
                   });
                 },
                 shape: RoundedRectangleBorder(
