@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:nemoa/presentation/screens/main_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class MessagesPage extends StatefulWidget {
   static const String routename = 'MessagesPage';
@@ -12,19 +14,19 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
+  final String apiKey = 'mariano sabe';
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _friendName;
   String? _friendAvatarUrl;
-  String? _userName;
+    String? _userName;
   bool _isLoading = true;
   int? _userId;
-  String? _userDescription;
+    String? _userDescription;
   String? _conversationStyle;
 
-  List<String> conversationHistory = [];
-  final int maxHistoryLength = 10;
+List<Map<String, String>> conversationHistory = [];
 
   Future<int> _getOrCreateTipoMensaje(String tipo) async {
     final supabase = Supabase.instance.client;
@@ -54,7 +56,7 @@ class _MessagesPageState extends State<MessagesPage> {
     }
   }
 
-  Future<void> _loadUserDataAndFriend() async {
+Future<void> _loadUserDataAndFriend() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
@@ -103,76 +105,105 @@ class _MessagesPageState extends State<MessagesPage> {
     }
   }
 
-  String _buildSystemPrompt() {
+String _buildSystemPrompt() {
     return '''Eres un amigo virtual llamado ${_friendName ?? 'Amigo'}. 
-Estás hablando con ${_userName ?? 'un usuario'}, quien se describe como: ${_userDescription ?? 'una persona amigable'}.
-Tu estilo de conversación es ${_conversationStyle ?? 'casual'}.
-Debes mantener consistencia con tu personalidad y adaptar tus respuestas al estilo conversacional indicado.
-Mantén presente el contexto de la conversación y la descripción del usuario para personalizar tus respuestas.Evita sonar tan formal y habla mas como un amigo cercano.''';
-  }
+    Estás hablando con ${_userName ?? 'un usuario'}, quien se describe como: ${_userDescription ?? 'una persona amigable'}.
+    Tu estilo de conversación es ${_conversationStyle ?? 'casual'}.
+    Debes mantener consistencia con tu personalidad y adaptar tus respuestas al estilo conversacional indicado.
+    Mantén presente el contexto de la conversación y la descripción del usuario para personalizar tus respuestas.Evita sonar tan formal y habla mas como un amigo cercano.''';
+      }
 
-  Future<void> _sendMessage() async {
-    if (_controller.text.isNotEmpty) {
-      final messageText = _controller.text;
-      _controller.clear();
+Future<void> _sendMessage() async {
+  if (_controller.text.isNotEmpty) {
+    final messageText = _controller.text;
+    _controller.clear();
 
-      final now = DateTime.now();
+    final now = DateTime.now();
 
-      // Agregar mensaje del usuario
-      setState(() {
-        _messages.add({'text': messageText, 'isUser': true, 'time': now});
+    // Agregar mensaje del usuario
+    setState(() {
+      _messages.add({'text': messageText, 'isUser': true, 'time': now});
+    });
+    _scrollToBottom(); // Desplazar al final después de agregar el mensaje del usuario.
+
+    await _saveMessage(messageText, true, now);
+
+    // Add user message to conversation history
+    conversationHistory.add({
+      'role': 'user',
+      'content': messageText,
+    });
+
+    try {
+      // Prepare the messages array for the request
+      final messages = [
+        {
+          'role': 'system',
+          'content': _buildSystemPrompt(),
+        },
+        ...conversationHistory, // Include conversation history
+      ];
+
+      final body = jsonEncode({
+        'model': 'gpt-4o-mini',
+        'messages': messages,
+        'max_tokens': 60, // Optional: Adjust token count based on your needs
       });
-      _scrollToBottom(); // Desplazar al final después de agregar el mensaje del usuario.
 
-      // Guardar mensaje
-      await _saveMessage(messageText, true, now);
+      // Send the POST request to the API
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: body,
+      );
 
-      try {
-        // Continuar con la lógica del bot
-        if (conversationHistory.length >= maxHistoryLength) {
-          conversationHistory.removeRange(0, 2);
-        }
-        conversationHistory.add("${_userName}: $messageText");
+      // Handle the response
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final reply = jsonResponse['choices']?[0]?['message']?['content'];
 
-        final model = GenerativeModel(
-          model: 'gemini-1.5-flash-8b',
-          apiKey: 'AIzaSyDa77VcOBcUythCYrcWYkSZyRo9JIZP7HQ',
-          systemInstruction: Content.system(_buildSystemPrompt()),
-          generationConfig: GenerationConfig(maxOutputTokens: 100),
-        );
+        if (reply != null) {
+          // Add assistant's reply to conversation history
+          conversationHistory.add({
+            'role': 'assistant',
+            'content': reply,
+          });
 
-        final chat = model.startChat();
-        final content = Content.text(conversationHistory.join("\n"));
-        final response = await chat.sendMessage(content);
-
-        if (response.text != null) {
+          // Save bot response to UI with timestamp
           final botTime = DateTime.now();
-          await _saveMessage(response.text!, false, botTime);
-          conversationHistory.add("${_friendName}: ${response.text!}");
+          await _saveMessage(reply, false, botTime);
 
           setState(() {
             _messages.add(
-                {'text': response.text!, 'isUser': false, 'time': botTime});
+              {'text': reply, 'isUser': false, 'time': botTime},
+            );
           });
+
           _scrollToBottom(); // Desplazar al final después de recibir la respuesta del bot.
+
+        } else {
+          throw Exception("Empty response from model.");
         }
-      } catch (error) {
-        print('Error sending message:: $error');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                error.toString().contains("Quota exceeded")
-                    ? "Request limit exceeded. Please try again later."
-                    : "Your message could not be processed. Please try again.",
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      } else {
+        throw Exception("API error: ${response.statusCode}, ${response.body}");
       }
+    } catch (error) {
+      print('Error sending message: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Could not process your message. Try again."),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+
+    // Scroll to the bottom of the chat
+    _scrollToBottom();
   }
+}
 
   Future<void> _saveMessage(
       String message, bool isUserMessage, DateTime time) async {
@@ -228,7 +259,7 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
             'time': DateTime.tryParse(message['fechaEnvio']) ?? DateTime.now(),
           });
         }
-        // Ordenar mensajes
+        //ordenar mensajes
         _messages.sort((a, b) {
           final timeA = a['time'] as DateTime;
           final timeB = b['time'] as DateTime;
@@ -254,7 +285,7 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
   @override
   void initState() {
     super.initState();
-    _loadUserDataAndFriend().then((_) {
+    _loadCurrentFriendData().then((_) {
       _loadMessages();
     });
     _scrollToBottom();
@@ -289,7 +320,7 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
             _isLoading = false;
           });
         } else {
-          print("No data found for the virtual friend");
+          print("No se encontraron datos del amigo virtual");
           setState(() {
             _isLoading = false;
           });
@@ -368,17 +399,17 @@ Mantén presente el contexto de la conversación y la descripción del usuario p
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _friendName ?? 'Unknown Friend',
+                          _friendName ?? 'Amigo Desconocido',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
+                        const Text(
                           'Online',
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color: Colors.black,
                             fontSize: 12,
                           ),
                         ),

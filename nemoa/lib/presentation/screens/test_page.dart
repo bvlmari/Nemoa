@@ -29,12 +29,22 @@ class TestPageState extends State<TestPage> {
   bool _isRecording = false;
   String _recordedFilePath = '';
 
+  String? _voiceName;
+  int? _velocity;
+
   String responseMessage = '';
 
   @override
   void initState() {
     super.initState();
     _initRecorder();
+  }
+
+  void updateVoiceSettings(String voiceName, int velocity) {
+    setState(() {
+      _voiceName = voiceName;
+      _velocity = velocity;
+    });
   }
 
   Future<void> _initRecorder() async {
@@ -200,7 +210,7 @@ class TestPageState extends State<TestPage> {
   // Function to convert text to speech using OpenAI API
   Future<void> _textToSpeech(String inputText) async {
     const String ttsModel = 'tts-1-hd'; // Model for TTS
-    const String voice = 'nova'; // Voice for the TTS
+    const String voice = 'alloy'; // Voice for the TTS
 
     try {
       final url = Uri.parse('https://api.openai.com/v1/audio/speech');
@@ -215,8 +225,8 @@ class TestPageState extends State<TestPage> {
       final body = jsonEncode({
         'model': ttsModel,
         'input': inputText,
-        'voice': voice,
-        'speed': 1.0,
+        'voice': _voiceName ?? voice,
+        'speed': _velocity ?? 1,
       });
 
       // Make the POST request
