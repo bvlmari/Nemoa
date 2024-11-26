@@ -20,8 +20,11 @@ class _MessagesPageState extends State<MessagesPage> {
   final ScrollController _scrollController = ScrollController();
   String? _friendName;
   String? _friendAvatarUrl;
+    String? _userName;
   bool _isLoading = true;
   int? _userId;
+    String? _userDescription;
+  String? _conversationStyle;
 
 List<Map<String, String>> conversationHistory = [];
 
@@ -53,10 +56,77 @@ List<Map<String, String>> conversationHistory = [];
     }
   }
 
+Future<void> _loadUserDataAndFriend() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // Obtener datos del usuario incluyendo el estilo conversacional
+        final userData = await supabase.from('usuarios').select('''
+              idUsuario,
+              nombre,
+              descripcion,
+              EstilosConversacionales!inner (
+                nombreEstilo
+              )
+            ''').eq('auth_user_id', user.id).single();
+
+        _userId = userData['idUsuario'];
+        _userName = userData['nombre'];
+        _userDescription = userData['descripcion'];
+        _conversationStyle =
+            userData['EstilosConversacionales']['nombreEstilo'];
+
+        // Obtener datos del amigo virtual
+        final friendData = await supabase.from('amigosVirtuales').select('''
+              nombre,
+              Apariencias (
+                Icono
+              )
+            ''').eq('idUsuario', _userId!).single();
+
+        setState(() {
+          _friendName = friendData['nombre'];
+          _friendAvatarUrl = friendData['Apariencias']['Icono'];
+          _isLoading = false;
+        });
+      } catch (error) {
+        print('Error loading data: $error');
+        setState(() {
+          _isLoading = false;
+          // Valores por defecto
+          _userName = 'Usuario';
+          _conversationStyle = 'casual';
+          _userDescription = 'Un usuario amigable';
+          _friendName = 'Amigo Virtual';
+        });
+      }
+    }
+  }
+
+String _buildSystemPrompt() {
+    return '''Eres un amigo virtual llamado ${_friendName ?? 'Amigo'}. 
+    Estás hablando con ${_userName ?? 'un usuario'}, quien se describe como: ${_userDescription ?? 'una persona amigable'}.
+    Tu estilo de conversación es ${_conversationStyle ?? 'casual'}.
+    Debes mantener consistencia con tu personalidad y adaptar tus respuestas al estilo conversacional indicado.
+    Mantén presente el contexto de la conversación y la descripción del usuario para personalizar tus respuestas.Evita sonar tan formal y habla mas como un amigo cercano.''';
+      }
+
 Future<void> _sendMessage() async {
   if (_controller.text.isNotEmpty) {
     final messageText = _controller.text;
     _controller.clear();
+
+    final now = DateTime.now();
+
+    // Agregar mensaje del usuario
+    setState(() {
+      _messages.add({'text': messageText, 'isUser': true, 'time': now});
+    });
+    _scrollToBottom(); // Desplazar al final después de agregar el mensaje del usuario.
+
+    await _saveMessage(messageText, true, now);
 
     // Add user message to conversation history
     conversationHistory.add({
@@ -64,16 +134,12 @@ Future<void> _sendMessage() async {
       'content': messageText,
     });
 
-    // Save user message to the UI with timestamp
-    final now = DateTime.now();
-    await _saveMessage(messageText, true, now);
-
     try {
       // Prepare the messages array for the request
       final messages = [
         {
           'role': 'system',
-          'content': 'You are a helpful assistant. You talk short and not long.',
+          'content': _buildSystemPrompt(),
         },
         ...conversationHistory, // Include conversation history
       ];
@@ -110,11 +176,14 @@ Future<void> _sendMessage() async {
           final botTime = DateTime.now();
           await _saveMessage(reply, false, botTime);
 
-          /*setState(() {
+          setState(() {
             _messages.add(
               {'text': reply, 'isUser': false, 'time': botTime},
             );
-          });*/
+          });
+
+          _scrollToBottom(); // Desplazar al final después de recibir la respuesta del bot.
+
         } else {
           throw Exception("Empty response from model.");
         }
@@ -136,54 +205,39 @@ Future<void> _sendMessage() async {
   }
 }
 
-Future<void> _saveMessage(
-    String message, bool isUserMessage, DateTime time) async {
-  try {
-    final supabase = Supabase.instance.client;
+  Future<void> _saveMessage(
+      String message, bool isUserMessage, DateTime time) async {
+    try {
+      final supabase = Supabase.instance.client;
 
-    // Obtener o crear el tipo de mensaje
-    final tipoMensajeId =
-        await _getOrCreateTipoMensaje(isUserMessage ? 'user' : 'bot');
+      // Obtener o crear el tipo de mensaje
+      final tipoMensajeId =
+          await _getOrCreateTipoMensaje(isUserMessage ? 'user' : 'bot');
 
-    // Guardar el mensaje en la tabla mensajes
-    await supabase
-        .from('mensajes')
-        .insert({
-          'contenidoMmensaje': message,
-          'emisor': isUserMessage ? _userId.toString() : 'bot',
-          'receptor': isUserMessage ? 'bot' : _userId.toString(),
-          'fechaEnvio': time.toIso8601String(),
-          'idTipo': tipoMensajeId,
-        })
-        .select()
-        .single();
-
-    // Actualizar el estado local (moved message addition here)
-    setState(() {
-      _messages.add({
-        'text': message,
-        'isUser': isUserMessage,
-        'time': time,
-      });
-      // Ordenar la lista
-      _messages.sort((a, b) {
-        final timeA = a['time'] as DateTime;
-        final timeB = b['time'] as DateTime;
-        return timeA.compareTo(timeB);
-      });
-    });
-  } catch (error) {
-    print('Error saving message: $error');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving message: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Guardar el mensaje en la tabla mensajes
+      await supabase
+          .from('mensajes')
+          .insert({
+            'contenidoMmensaje': message,
+            'emisor': isUserMessage ? _userId.toString() : 'bot',
+            'receptor': isUserMessage ? 'bot' : _userId.toString(),
+            'fechaEnvio': time.toIso8601String(),
+            'idTipo': tipoMensajeId,
+          })
+          .select()
+          .single();
+    } catch (error) {
+      print('Error saving message: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving message: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
-}
 
   Future<void> _loadMessages() async {
     try {
@@ -212,6 +266,9 @@ Future<void> _saveMessage(
           return timeA.compareTo(timeB);
         });
       });
+
+      // Desplazar al final después de cargar los mensajes
+      _scrollToBottom();
     } catch (error) {
       print('Error loading messages: $error');
     }
