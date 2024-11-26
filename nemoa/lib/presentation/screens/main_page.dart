@@ -53,11 +53,31 @@ class _MainPageState extends State<MainPage>
           // 2. Buscar el amigo virtual del usuario
           final virtualFriend = await supabase
               .from('amigosVirtuales')
-              .select('*, Apariencias(*)')
+              .select('idVoz, Apariencias(*)')
               .eq('idUsuario', userData['idUsuario'])
               .single();
 
           if (virtualFriend != null && virtualFriend['Apariencias'] != null) {
+            // 3. Use idVoz to fetch voice settings from the 'Voces' table
+            final voiceData = await supabase
+                .from('Voces')
+                .select('tono, velocidad')
+                .eq('idVoz', virtualFriend['idVoz'])
+                .single();
+
+            if (voiceData != null) {
+              // Pass voice settings to TestPage or use them directly
+              final voiceName = voiceData['tono'] as String;
+              final velocity = voiceData['velocidad'] as int;
+
+              // Example: Passing data to TestPage
+              testPageKey.currentState?.updateVoiceSettings(voiceName, velocity);
+              //TestPage.of(context)?.updateVoiceSettings(voiceName, velocity);
+
+            } else {
+              debugPrint('No voice data found for idVoz: ${virtualFriend['idVoz']}');
+            }
+
             setState(() {
               _iconUrl = virtualFriend['Apariencias']['Icono'];
               _accessory = virtualFriend['Apariencias']['accesorios'];
