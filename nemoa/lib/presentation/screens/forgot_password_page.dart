@@ -18,7 +18,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final email = _emailController.text.trim();
 
     if (email.isEmpty) {
-      _showMessage('Por favor ingresa tu correo electrónico', isError: true);
+      _showMessage('Enter you email', isError: true);
       return;
     }
 
@@ -45,7 +45,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
       if (mounted) {
         _showMessage(
-          'Correo electrónico verificado. Redirigiendo a la página de restablecimiento de contraseña...',
+          'Email verified, redirecting to reset password page...',
           isError: false,
         );
 
@@ -107,7 +107,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Olvidaste tu contraseña?',
+                'Forgot your password?',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -116,7 +116,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Ingresa tu correo electrónico y te redigiremos a un apartado para cambiar tu contraseña',
+                'Enter your email to get redirected to the reset password page',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
@@ -175,7 +175,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           ),
                         )
                       : const Text(
-                          'Verificar email',
+                          'Verify email',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,

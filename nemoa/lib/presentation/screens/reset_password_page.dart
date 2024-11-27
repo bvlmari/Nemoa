@@ -43,7 +43,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     }
 
     if (password != confirmPassword) {
-      _showMessage('Las contraseñas no coinciden', isError: true);
+      _showMessage('Passwords dont match', isError: true);
       return;
     }
 
@@ -83,7 +83,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
       if (mounted) {
         _showMessage(
-          'Contraseña actualizada exitosamente',
+          'Password updated succesfully',
           isError: false,
         );
 
@@ -144,7 +144,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Nueva Contraseña',
+          'New password',
           style: TextStyle(color: Colors.white),
         ),
       ),
@@ -155,7 +155,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Establece tu nueva contraseña',
+                'Enter new password',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
@@ -163,7 +163,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               ),
               const SizedBox(height: 30),
               const Text(
-                'Nueva Contraseña',
+                'New password',
                 style: TextStyle(fontSize: 16, color: Colors.white),
               ),
               const SizedBox(height: 10),
@@ -173,7 +173,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white10,
-                  hintText: 'Ingresa tu nueva contraseña',
+                  hintText: 'Enter your new password',
                   hintStyle: const TextStyle(color: Colors.grey),
                   border: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.white54),
@@ -200,7 +200,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Confirmar Contraseña',
+                'Confirm password',
                 style: TextStyle(fontSize: 16, color: Colors.white),
               ),
               const SizedBox(height: 10),
@@ -210,7 +210,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white10,
-                  hintText: 'Confirma tu nueva contraseña',
+                  hintText: 'Confirm your new password',
                   hintStyle: const TextStyle(color: Colors.grey),
                   border: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.white54),
@@ -263,7 +263,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                           ),
                         )
                       : const Text(
-                          'Actualizar Contraseña',
+                          'Update password',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
