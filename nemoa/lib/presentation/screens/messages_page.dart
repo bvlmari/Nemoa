@@ -406,10 +406,10 @@ Future<void> _sendMessage() async {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Online',
                           style: TextStyle(
-                            color: Colors.black,
+                            color: Colors.grey[400],
                             fontSize: 12,
                           ),
                         ),

@@ -31,26 +31,6 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/flor-removebg-preview.png'
     },
     {
-      'name': 'Lazo rosa',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lazo-removebg-preview.png'
-    },
-    {
-      'name': 'Lazo rojo',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lazo_rojo-removebg-preview.png'
-    },
-    {
-      'name': 'Lentes 1',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lentes1-removebg-preview.png'
-    },
-    {
-      'name': 'Lentes 2',
-      'imageUrl':
-          'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/lentes-removebg-preview.png'
-    },
-    {
       'name': 'sombrero',
       'imageUrl':
           'https://mdkbllkmhzodbbeweofy.supabase.co/storage/v1/object/public/Assets/accesories/sombrero-removebg-preview.png'
